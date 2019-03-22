@@ -1,11 +1,13 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"strings"
 
 	yaml "gopkg.in/yaml.v2"
+	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 )
 
 func NodeConfigFromFile(path string) (*NodeConfig, error) {
@@ -18,14 +20,21 @@ func NodeConfigFromFile(path string) (*NodeConfig, error) {
 
 func NodeConfigFromBytes(data []byte) (*NodeConfig, error) {
 	c := &NodeConfig{}
-	err := yaml.Unmarshal(data, c)
+
+	reader := bytes.NewReader(data)
+	decoder := k8syaml.NewYAMLToJSONDecoder(reader)
+	err := decoder.Decode(c)
+
+	if err != nil {
+		return nil, err
+	}
 
 	// Validate node class names for uniquenes
 	classNames := map[string]bool{}
 	for _, class := range c.NodeClasses {
 		name := strings.ToLower(class.Name)
 		if _, exists := classNames[name]; exists {
-			return nil, fmt.Errorf("node class name [%s] is not unique")
+			return nil, fmt.Errorf("node class name [%s] is not unique", name)
 		}
 		classNames[name] = true
 	}

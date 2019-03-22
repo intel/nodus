@@ -1,0 +1,13 @@
+podClasses:
+  4-cpu:
+    apiVersion: v1
+    kind: Pod
+    spec:
+      containers:
+      - image: busybox
+        imagePullPolicy: IfNotPresent
+        name: c1
+        command: ["sleep", "inf"]
+        resources:
+          limits:
+            cpu: 4

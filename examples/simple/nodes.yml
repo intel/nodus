@@ -1,0 +1,25 @@
+nodeClasses:
+- name: large
+  count: 1
+  labels:
+    nodus-ponens: true
+    np.class: type-a
+  resources:
+    capacity:
+      cpu: "8"
+      memory: "128Gi"
+    allocatable:
+      cpu: "8"
+      memory: "128Gi"
+- name: small
+  count: 2
+  labels:
+    nodus-ponens: true
+    np.class: type-b
+  resources:
+    capacity:
+      cpu: "2"
+      memory: "8Gi"
+    allocatable:
+      cpu: "2"
+      memory: "8Gi"

@@ -1,0 +1,57 @@
+jobClasses:
+  - name: 2-cpu-4-gang
+    labels:
+      np.class: 2-cpu-4-gang
+    annotations:
+      k8s.gang.io: "true"
+    spec:
+      template:
+        metadata:
+          labels:
+            np.class: 2-cpu-4-gang
+            np.runDuration: 5s
+            np.terminalPhase: Succeeded
+        spec:
+          # Need this as the controller manager marks a node unreachable
+          tolerations:
+          - key: node.kubernetes.io/unreachable
+            effect: NoSchedule
+          containers:
+          - name: pi
+            image: ubuntu:16.04
+            command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+            resources:
+              requests:
+                cpu: 2
+                memory: 128Mi
+          restartPolicy: Never
+      parallelism: 4
+      completions: 4
+  - name: 1-cpu-6-gang
+    annotations:
+      k8s.gang.io: "true"
+    labels:
+      np.class: 1-cpu-6-gang
+    spec:
+      template:
+        metadata:
+          labels:
+            np.class: 1-cpu-6-gang
+            np.runDuration: 5s
+            np.terminalPhase: Succeeded
+        spec:
+          # Need this as the controller manager marks a node unreachable
+          tolerations:
+          - key: node.kubernetes.io/unreachable
+            effect: NoSchedule
+          containers:
+          - name: pi
+            image: ubuntu:16.04
+            command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+            resources:
+              requests:
+                cpu: 1
+                memory: 128Mi
+          restartPolicy: Never
+      parallelism: 6
+      completions: 6

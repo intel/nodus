@@ -70,7 +70,7 @@ func parseSteps(rawSteps []string) ([]*Step, error) {
 // <is>         => "is" | "are"
 // <count>      => [1-9][0-9]*
 // <class>      => [A-Za-z0-9\-]+
-// <object>     => "pod[s]" | "node[s]"
+// <object>     => "pod[s]" | "node[s]" | "job[s]"
 // <phase>      => "Pending" | "Running" | "Succeeded" | "Failed" | "Unknown"
 // <duration>   => time.Duration
 
@@ -277,6 +277,8 @@ func parseObject(o string) (Object, error) {
 		return Pod, nil
 	case Node:
 		return Node, nil
+	case Job:
+		return Job, nil
 	}
 	return obj, fmt.Errorf("object must be either `node` or `pod`: (found `%s`)", obj)
 }
@@ -354,6 +356,7 @@ type Object string
 const (
 	Node Object = "node"
 	Pod  Object = "pod"
+	Job  Object = "job"
 )
 
 type Class string

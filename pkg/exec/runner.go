@@ -9,6 +9,7 @@ import (
 
 	"github.com/IntelAI/nodus/pkg/config"
 	"github.com/IntelAI/nodus/pkg/node"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	wait "k8s.io/apimachinery/pkg/util/wait"
@@ -22,7 +23,7 @@ type ScenarioRunner interface {
 	RunDelete(step *config.Step) error
 }
 
-func NewScenarioRunner(client *kubernetes.Clientset, namespace string, nodeConfig *config.NodeConfig, podConfig *config.PodConfig) ScenarioRunner {
+func NewScenarioRunner(client *kubernetes.Clientset, namespace string, nodeConfig *config.NodeConfig, podConfig *config.PodConfig, jobConfig *config.JobConfig) ScenarioRunner {
 	return &runner{
 		client:     client,
 		namespace:  namespace,
@@ -30,6 +31,8 @@ func NewScenarioRunner(client *kubernetes.Clientset, namespace string, nodeConfi
 		podConfig:  podConfig,
 		gcPods:     map[string]bool{},
 		gcNodes:    map[string]bool{},
+		gcJobs:     map[string]bool{},
+		jobConfig:  jobConfig,
 	}
 }
 
@@ -40,6 +43,8 @@ type runner struct {
 	nodeConfig *config.NodeConfig
 	gcPods     map[string]bool
 	gcNodes    map[string]bool
+	gcJobs     map[string]bool
+	jobConfig  *config.JobConfig
 }
 
 func (r *runner) cleanup() {
@@ -53,6 +58,11 @@ func (r *runner) cleanup() {
 	nodeClient := r.client.CoreV1().Nodes()
 	for node := range r.gcNodes {
 		nodeClient.Delete(node, deleteOptions)
+	}
+
+	jobClient := r.client.BatchV1().Jobs(r.namespace)
+	for job := range r.gcJobs {
+		jobClient.Delete(job, deleteOptions)
 	}
 }
 
@@ -112,7 +122,7 @@ func (r *runner) assertNode(assert *config.AssertStep) error {
 }
 
 func (r *runner) assertPod(assert *config.AssertStep) error {
-	// Supported grammar: "assert" <count> [<class>] <object> [<is> <phase>] [<is> <phase>] [<within> <count> seconds]
+	// Supported grammar: "assert" <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]
 	var labelSelector string
 	if assert.Class != "" {
 		labelSelector = fmt.Sprintf("np.class=%s", assert.Class)
@@ -220,6 +230,38 @@ func (r *runner) createPod(create *config.CreateStep) error {
 	return fmt.Errorf("class: %s not found in the pod config", create.Class)
 }
 
+func (r *runner) createJob(create *config.CreateStep) error {
+	// Supported grammar: "create" <count> <class> <object>
+
+	if r.jobConfig == nil {
+		return fmt.Errorf("no job config passed to create a job")
+	}
+
+	jobClient := r.client.BatchV1().Jobs(r.namespace)
+	for _, class := range r.jobConfig.JobClasses {
+		if config.Class(class.Name) == create.Class {
+			for i := uint64(0); i < create.Count; i++ {
+				// Create the job
+				jobName := fmt.Sprintf("%s-%d", class.Name, i)
+				job := &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        jobName,
+						Labels:      class.Labels,
+						Annotations: class.Annotations,
+					},
+					Spec: class.Spec,
+				}
+				if _, err := jobClient.Create(job); err != nil {
+					return err
+				}
+				r.gcJobs[jobName] = true
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("class: %s not found in the job config", create.Class)
+}
+
 func (r *runner) RunCreate(step *config.Step) error {
 	if step.Create == nil {
 		return fmt.Errorf("there is no create in this step.")
@@ -230,6 +272,8 @@ func (r *runner) RunCreate(step *config.Step) error {
 		return r.createNode(step.Create)
 	case config.Pod:
 		return r.createPod(step.Create)
+	case config.Job:
+		return r.createJob(step.Create)
 	}
 
 	return fmt.Errorf("create object: %s not supported", step.Create.Object)
@@ -346,6 +390,31 @@ func (r *runner) deletePod(del *config.DeleteStep) error {
 	return nil
 }
 
+func (r *runner) deleteJob(del *config.DeleteStep) error {
+	// Supported grammar: "delete" <count> <class> <object>
+	jobs, err := r.client.BatchV1().Jobs(r.namespace).List(metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("np.class=%s", del.Class),
+	})
+	if err != nil {
+		return fmt.Errorf("no jobs found for class: %s", del.Class)
+	}
+	if uint64(len(jobs.Items)) < del.Count {
+		return fmt.Errorf("found %d jobs of class: %s, but expected: %d", len(jobs.Items), del.Class, del.Count)
+	}
+	propagationPolicy := metav1.DeletePropagationBackground
+
+	for i := uint64(0); i < del.Count; i++ {
+		err = r.client.BatchV1().Jobs(r.namespace).Delete(jobs.Items[i].Name, &metav1.DeleteOptions{
+			PropagationPolicy: &propagationPolicy,
+		})
+		if err != nil {
+			return err
+		}
+		delete(r.gcJobs, jobs.Items[i].Name)
+	}
+	return nil
+}
+
 func (r *runner) RunDelete(step *config.Step) error {
 	if step.Delete == nil {
 		return fmt.Errorf("there is no delete in this step.")
@@ -356,6 +425,8 @@ func (r *runner) RunDelete(step *config.Step) error {
 		return r.deleteNode(step.Delete)
 	case config.Pod:
 		return r.deletePod(step.Delete)
+	case config.Job:
+		return r.deleteJob(step.Delete)
 	}
 
 	return fmt.Errorf("delete object: %s not supported", step.Delete.Object)

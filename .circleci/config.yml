@@ -1,0 +1,17 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: golang:1.10
+    working_directory: /go/src/github.com/IntelAI/nodus
+    steps:
+      - checkout
+      - run:
+          name: install dependencies
+          command: |
+             go get -u github.com/golang/dep/cmd/dep
+      - run: 
+          name: unit test and install
+          command: |
+             make install_dependencies
+             make install

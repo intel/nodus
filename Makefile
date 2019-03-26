@@ -12,6 +12,9 @@ k8s-up:
 k8s-down:
 	docker-compose down
 
+install_dependencies:
+	dep ensure -v
+
 install:
 	go install ./cmd/...
 

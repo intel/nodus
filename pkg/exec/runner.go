@@ -28,6 +28,8 @@ func NewScenarioRunner(client *kubernetes.Clientset, namespace string, nodeConfi
 		namespace:  namespace,
 		nodeConfig: nodeConfig,
 		podConfig:  podConfig,
+		gcPods:     map[string]bool{},
+		gcNodes:    map[string]bool{},
 	}
 }
 
@@ -36,11 +38,28 @@ type runner struct {
 	namespace  string
 	podConfig  *config.PodConfig
 	nodeConfig *config.NodeConfig
+	gcPods     map[string]bool
+	gcNodes    map[string]bool
+}
+
+func (r *runner) cleanup() {
+	log.Info("Cleaning up resources")
+	podClient := r.client.CoreV1().Pods(r.namespace)
+	deleteOptions := &metav1.DeleteOptions{}
+	for pod := range r.gcPods {
+		podClient.Delete(pod, deleteOptions)
+	}
+
+	nodeClient := r.client.CoreV1().Nodes()
+	for node := range r.gcNodes {
+		nodeClient.Delete(node, deleteOptions)
+	}
 }
 
 func (r *runner) RunScenario(scenario *config.Scenario) error {
 	log.WithFields(log.Fields{"name": scenario.Name}).Info("run scenario")
 	numSteps := len(scenario.Steps)
+	defer r.cleanup()
 	for i, step := range scenario.Steps {
 		raw := scenario.RawSteps[i]
 		log.WithFields(log.Fields{
@@ -158,11 +177,13 @@ func (r *runner) createNode(create *config.CreateStep) error {
 	for _, class := range r.nodeConfig.NodeClasses {
 		if config.Class(class.Name) == create.Class {
 			for i := uint64(0); i < create.Count; i++ {
-				n := node.NewFakeNode(fmt.Sprintf("%s-%d", class.Name, i), class.Name, class.Labels, class.Resources)
+				nodeName := fmt.Sprintf("%s-%d", class.Name, i)
+				n := node.NewFakeNode(nodeName, class.Name, class.Labels, class.Resources)
 				err := n.Start(r.client)
 				if err != nil {
 					return fmt.Errorf("could not create node of class: %s, err: %s", create.Class, err.Error())
 				}
+				r.gcNodes[nodeName] = true
 			}
 			return nil
 		}
@@ -179,9 +200,10 @@ func (r *runner) createPod(create *config.CreateStep) error {
 		if config.Class(class.Name) == create.Class {
 			for i := uint64(0); i < create.Count; i++ {
 				// Create the pod
+				podName := fmt.Sprintf("%s-%d", class.Name, i)
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:   fmt.Sprintf("%s-%d", class.Name, i),
+						Name:   podName,
 						Labels: class.Labels,
 					},
 					Spec: class.Spec,
@@ -189,6 +211,7 @@ func (r *runner) createPod(create *config.CreateStep) error {
 				if _, err := podClient.Create(pod); err != nil {
 					return err
 				}
+				r.gcPods[podName] = true
 			}
 			return nil
 		}
@@ -277,45 +300,47 @@ func (r *runner) RunChange(step *config.Step) error {
 	return fmt.Errorf("change object: %s not supported", step.Change.Object)
 }
 
-func (r *runner) deleteNode(delete *config.DeleteStep) error {
+func (r *runner) deleteNode(del *config.DeleteStep) error {
 	// Supported grammar: "delete" <count> <class> <object>
 	nodes, err := r.client.CoreV1().Nodes().List(metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("np.class=%s", delete.Class),
+		LabelSelector: fmt.Sprintf("np.class=%s", del.Class),
 	})
 	if err != nil {
-		return fmt.Errorf("no nodes found for class: %s", delete.Class)
+		return fmt.Errorf("no nodes found for class: %s", del.Class)
 	}
-	if uint64(len(nodes.Items)) < delete.Count {
-		return fmt.Errorf("found %d nodes of class: %s, but expected: %d", len(nodes.Items), delete.Class, delete.Count)
+	if uint64(len(nodes.Items)) < del.Count {
+		return fmt.Errorf("found %d nodes of class: %s, but expected: %d", len(nodes.Items), del.Class, del.Count)
 	}
 
-	for i := uint64(0); i < delete.Count; i++ {
+	for i := uint64(0); i < del.Count; i++ {
 		err = r.client.CoreV1().Nodes().Delete(nodes.Items[i].Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
+		delete(r.gcNodes, nodes.Items[i].Name)
 	}
 
 	return nil
 }
 
-func (r *runner) deletePod(delete *config.DeleteStep) error {
+func (r *runner) deletePod(del *config.DeleteStep) error {
 	// Supported grammar: "delete" <count> <class> <object>
 	pods, err := r.client.CoreV1().Pods(r.namespace).List(metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("np.class=%s", delete.Class),
+		LabelSelector: fmt.Sprintf("np.class=%s", del.Class),
 	})
 	if err != nil {
-		return fmt.Errorf("no pods found for class: %s", delete.Class)
+		return fmt.Errorf("no pods found for class: %s", del.Class)
 	}
-	if uint64(len(pods.Items)) < delete.Count {
-		return fmt.Errorf("found %d pods of class: %s, but expected: %d", len(pods.Items), delete.Class, delete.Count)
+	if uint64(len(pods.Items)) < del.Count {
+		return fmt.Errorf("found %d pods of class: %s, but expected: %d", len(pods.Items), del.Class, del.Count)
 	}
 
-	for i := uint64(0); i < delete.Count; i++ {
+	for i := uint64(0); i < del.Count; i++ {
 		err = r.client.CoreV1().Pods(r.namespace).Delete(pods.Items[i].Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
+		delete(r.gcPods, pods.Items[i].Name)
 	}
 	return nil
 }

@@ -146,10 +146,10 @@ func (r *runner) RunAssert(step *config.Step) error {
 		Factor:   1,
 		Steps:    int(step.Assert.Delay.Seconds()),
 	}
-	var err error
 
 	switch step.Assert.Object {
 	case config.Node:
+		err := r.assertNode(step.Assert)
 		for backoffWait.Steps > 0 {
 			err = r.assertNode(step.Assert)
 			if err == nil {
@@ -159,6 +159,7 @@ func (r *runner) RunAssert(step *config.Step) error {
 		}
 		return err
 	case config.Pod:
+		err := r.assertPod(step.Assert)
 		for backoffWait.Steps > 0 {
 			err = r.assertPod(step.Assert)
 			if err == nil {

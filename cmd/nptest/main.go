@@ -15,7 +15,7 @@ func main() {
 	usage := `nptest - Test Kubernetes Scheduling Scenarios.
 
 Usage:
-  nptest --scenario=<config> --pods=<config> [--namespace=<ns>]
+  nptest --scenario=<config> --pods=<config> --nodes=<config> [--namespace=<ns>]
     [--master=<url> | --kubeconfig=<kconfig>] [--verbose]
   nptest -h | --help
 
@@ -23,7 +23,8 @@ Options:
   -h --help              Show this screen.
   --scenario=<config>    Test scenario config file.
   --pods=<config>        Test pod config file.
-	--namespace=<ns>       Namespace to use for tests (will be created if
+  --nodes=<config>       Nodes config file.
+  --namespace=<ns>       Namespace to use for tests (will be created if
 	                       it does not exist) [default: default]
   --master=<url>         Kubernetes API server URL.
   --kubeconfig=<config>  Kubernetes client config file [default: kconfig].
@@ -44,9 +45,16 @@ Options:
 	}
 
 	podConfigPath, _ := args.String("--pods")
-	_, err = config.PodConfigFromFile(podConfigPath)
+	podConfig, err := config.PodConfigFromFile(podConfigPath)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to read pod config")
+		os.Exit(1)
+	}
+
+	nodeConfigPath, _ := args.String("--nodes")
+	nodeConfig, err := config.NodeConfigFromFile(nodeConfigPath)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to read node config")
 		os.Exit(1)
 	}
 
@@ -61,7 +69,7 @@ Options:
 
 	// construct scenario runner
 	namespace, _ := args.String("--namespace")
-	runner := exec.NewScenarioRunner(k8sclient, namespace)
+	runner := exec.NewScenarioRunner(k8sclient, namespace, nodeConfig, podConfig)
 	err = runner.RunScenario(scenario)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to complete scenario")

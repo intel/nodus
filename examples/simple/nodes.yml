@@ -3,7 +3,7 @@ nodeClasses:
   count: 1
   labels:
     nodus-ponens: true
-    np.class: type-a
+    np.class: large
   resources:
     capacity:
       cpu: "8"
@@ -15,7 +15,7 @@ nodeClasses:
   count: 2
   labels:
     nodus-ponens: true
-    np.class: type-b
+    np.class: small
   resources:
     capacity:
       cpu: "2"

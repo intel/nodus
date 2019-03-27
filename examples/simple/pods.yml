@@ -1,7 +1,9 @@
 podClasses:
-  4-cpu:
-    apiVersion: v1
-    kind: Pod
+  - name: 4-cpu
+    labels:
+      np.class: 4-cpu
+      np.runDuration: 3s
+      np.terminalPhase: Succeeded
     spec:
       containers:
       - image: busybox
@@ -10,4 +12,18 @@ podClasses:
         command: ["sleep", "inf"]
         resources:
           limits:
-            cpu: 4
+            cpu: "4"
+  - name: 1-cpu
+    labels:
+      np.class: 1-cpu
+      np.runDuration: 10s
+      np.terminalPhase: Succeeded
+    spec:
+      containers:
+      - image: busybox
+        imagePullPolicy: IfNotPresent
+        name: c1
+        command: ["sleep", "inf"]
+        resources:
+          limits:
+            cpu: "1"

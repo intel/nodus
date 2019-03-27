@@ -5,9 +5,10 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
+	"time"
 
 	yaml "gopkg.in/yaml.v2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 func ScenarioFromFile(path string) (*Scenario, error) {
@@ -62,7 +63,7 @@ func parseSteps(rawSteps []string) ([]*Step, error) {
 // Step grammar:
 //
 // <step>       => <assertStep> | <createStep> | <changeStep> | <deleteStep>
-// <assertStep> => "assert" <count> [<class>] <object> [<is> <phase>]
+// <assertStep> => "assert" <count> [<class>] <object> [<is> <phase>] [<within> <duration>]
 // <createStep> => "create" <count> <class> <object>
 // <changeStep> => "change" <count> <class> <object> "from" <phase> "to" <phase>
 // <deleteStep> => "delete" <count> <class> <object>
@@ -71,12 +72,13 @@ func parseSteps(rawSteps []string) ([]*Step, error) {
 // <class>      => [A-Za-z0-9\-]+
 // <object>     => "pod[s]" | "node[s]"
 // <phase>      => "Pending" | "Running" | "Succeeded" | "Failed" | "Unknown"
+// <duration>   => time.Duration
 
 func parseStep(raw string) (*Step, error) {
 	raw = strings.ToLower(raw)
 	parts := strings.Split(raw, " ")
 	if len(parts) < 3 {
-		return nil, fmt.Errorf(`not enough words (need at least: "verb count object")`, raw)
+		return nil, fmt.Errorf(`not enough words (need at least: "verb count object"), but given: %s`, raw)
 	}
 
 	step := &Step{
@@ -124,64 +126,85 @@ func parseCount(raw string) (uint64, error) {
 	return strconv.ParseUint(strings.TrimSpace(raw), 10, 64)
 }
 
-// <assertStep> => "assert" <count> [<class>] <object> [<is> <phase>]
+func getNext(array []string) (string, []string, error) {
+	if len(array) == 0 {
+		return "", []string{}, fmt.Errorf("Insufficient elements in array")
+	}
+	next, rem := array[0], array[1:]
+	return next, rem, nil
+}
+
+// <assertStep> => "assert" <count> [<class>] <object> [<is> <phase>] [<within> <duration>]
 func parseAssertStep(count uint64, predicate []string) (*AssertStep, error) {
 	result := &AssertStep{Count: count}
-	// assert <count> <object>
-	if len(predicate) == 1 {
-		obj, err := parseObject(predicate[0])
+
+	// Check for the first 2 predicates.
+	// Check if first predicate is object
+	next, rem, err := getNext(predicate)
+	if err != nil {
+		return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
+	}
+
+	obj, err := parseObject(next)
+	if err != nil {
+		// Check if count is provided and check if second predicate is object
+		var e error
+		next, rem, e = getNext(rem)
+		if e != nil {
+			return nil, err
+		}
+
+		obj, err = parseObject(next)
 		if err != nil {
 			return nil, err
 		}
-		result.Object = obj
-		return result, nil
-	}
-	// assert <count> <class> <object>
-	if len(predicate) == 2 {
+
+		// This means first is class
 		result.Class = Class(predicate[0])
-		obj, err := parseObject(predicate[1])
-		if err != nil {
-			return nil, err
-		}
 		result.Object = obj
+	} else {
+		// No count is provided, use object instead.
+		result.Object = obj
+	}
+
+	// Now check if either phase is provided or delay is provided.
+	next, rem, err = getNext(rem)
+	if err != nil {
 		return result, nil
 	}
-	// assert <count> <object> <is> <phase>
-	if len(predicate) == 3 {
-		obj, err := parseObject(predicate[0])
+	// Check if there is a "is" or "are"
+	if next == "is" || next == "are" {
+		next, rem, err = getNext(rem)
 		if err != nil {
+			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
+		}
+		ph, err := parsePhase(next)
+
+		if err == nil {
+
+			result.PodPhase = ph
+			next, rem, err = getNext(rem)
+			if err != nil {
+				return result, nil
+			}
+		} else if next != "within" {
 			return nil, err
 		}
-		result.Object = obj
-		if predicate[1] != "is" || predicate[1] != "are" {
-			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>]")
-		}
-		ph, err := parsePhase(predicate[2])
-		if err != nil {
-			return nil, err
-		}
-		result.PodPhase = ph
-		return result, nil
 	}
-	// assert <count> <class> <object> <is> <phase>
-	if len(predicate) == 4 {
-		result.Class = Class(predicate[0])
-		obj, err := parseObject(predicate[1])
+	// Check if there is within
+	if next == "within" {
+		next, rem, err = getNext(rem)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
 		}
-		result.Object = obj
-		if predicate[2] != "is" && predicate[2] != "are" {
-			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>]")
-		}
-		ph, err := parsePhase(predicate[3])
+		duration, err := time.ParseDuration(next)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
 		}
-		result.PodPhase = ph
-		return result, nil
+		result.Delay = duration
 	}
-	return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>]")
+
+	return result, nil
 }
 
 // <createStep> => "create" <count> <class> <object>
@@ -294,6 +317,7 @@ type AssertStep struct {
 	Class    Class // optional
 	Object   Object
 	PodPhase v1.PodPhase // optional
+	Delay    time.Duration
 }
 
 type CreateStep struct {

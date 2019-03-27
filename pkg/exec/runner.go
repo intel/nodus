@@ -117,22 +117,22 @@ func (r *runner) assertPod(assert *config.AssertStep) error {
 	return nil
 }
 
-func (r *runner) RunAssert(scenario *config.Step) error {
-	if scenario.Assert == nil {
-		return fmt.Errorf("there is no assert in this scenario.")
+func (r *runner) RunAssert(step *config.Step) error {
+	if step.Assert == nil {
+		return fmt.Errorf("there is no assert in this step.")
 	}
 
 	backoffWait := wait.Backoff{
 		Duration: 1 * time.Second,
 		Factor:   1,
-		Steps:    scenario.Assert.Delay,
+		Steps:    int(step.Assert.Delay.Seconds()),
 	}
 	var err error
 
-	switch scenario.Assert.Object {
+	switch step.Assert.Object {
 	case config.Node:
 		for backoffWait.Steps > 0 {
-			err = r.assertNode(scenario.Assert)
+			err = r.assertNode(step.Assert)
 			if err == nil {
 				break
 			}
@@ -141,7 +141,7 @@ func (r *runner) RunAssert(scenario *config.Step) error {
 		return err
 	case config.Pod:
 		for backoffWait.Steps > 0 {
-			err = r.assertPod(scenario.Assert)
+			err = r.assertPod(step.Assert)
 			if err == nil {
 				break
 			}
@@ -149,7 +149,7 @@ func (r *runner) RunAssert(scenario *config.Step) error {
 		}
 		return err
 	}
-	return fmt.Errorf("assert object: %s not supported", scenario.Assert.Object)
+	return fmt.Errorf("assert object: %s not supported", step.Assert.Object)
 }
 
 func (r *runner) createNode(create *config.CreateStep) error {
@@ -196,19 +196,19 @@ func (r *runner) createPod(create *config.CreateStep) error {
 	return fmt.Errorf("class: %s not found in the pod config", create.Class)
 }
 
-func (r *runner) RunCreate(scenario *config.Step) error {
-	if scenario.Create == nil {
-		return fmt.Errorf("there is no create in this scenario.")
+func (r *runner) RunCreate(step *config.Step) error {
+	if step.Create == nil {
+		return fmt.Errorf("there is no create in this step.")
 	}
 
-	switch scenario.Create.Object {
+	switch step.Create.Object {
 	case config.Node:
-		return r.createNode(scenario.Create)
+		return r.createNode(step.Create)
 	case config.Pod:
-		return r.createPod(scenario.Create)
+		return r.createPod(step.Create)
 	}
 
-	return fmt.Errorf("create object: %s not supported", scenario.Create.Object)
+	return fmt.Errorf("create object: %s not supported", step.Create.Object)
 }
 
 func (r *runner) changePod(change *config.ChangeStep) error {
@@ -266,15 +266,15 @@ func (r *runner) changePod(change *config.ChangeStep) error {
 	return nil
 }
 
-func (r *runner) RunChange(scenario *config.Step) error {
-	if scenario.Change == nil {
-		return fmt.Errorf("there is no change in this scenario.")
+func (r *runner) RunChange(step *config.Step) error {
+	if step.Change == nil {
+		return fmt.Errorf("there is no change in this step.")
 	}
-	switch scenario.Change.Object {
+	switch step.Change.Object {
 	case config.Pod:
-		return r.changePod(scenario.Change)
+		return r.changePod(step.Change)
 	}
-	return fmt.Errorf("change object: %s not supported", scenario.Change.Object)
+	return fmt.Errorf("change object: %s not supported", step.Change.Object)
 }
 
 func (r *runner) deleteNode(delete *config.DeleteStep) error {
@@ -320,17 +320,17 @@ func (r *runner) deletePod(delete *config.DeleteStep) error {
 	return nil
 }
 
-func (r *runner) RunDelete(scenario *config.Step) error {
-	if scenario.Delete == nil {
-		return fmt.Errorf("there is no delete in this scenario.")
+func (r *runner) RunDelete(step *config.Step) error {
+	if step.Delete == nil {
+		return fmt.Errorf("there is no delete in this step.")
 	}
 
-	switch scenario.Delete.Object {
+	switch step.Delete.Object {
 	case config.Node:
-		return r.deleteNode(scenario.Delete)
+		return r.deleteNode(step.Delete)
 	case config.Pod:
-		return r.deletePod(scenario.Delete)
+		return r.deletePod(step.Delete)
 	}
 
-	return fmt.Errorf("delete object: %s not supported", scenario.Delete.Object)
+	return fmt.Errorf("delete object: %s not supported", step.Delete.Object)
 }

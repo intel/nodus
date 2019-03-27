@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
+	"time"
 
 	yaml "gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
@@ -62,7 +63,7 @@ func parseSteps(rawSteps []string) ([]*Step, error) {
 // Step grammar:
 //
 // <step>       => <assertStep> | <createStep> | <changeStep> | <deleteStep>
-// <assertStep> => "assert" <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]
+// <assertStep> => "assert" <count> [<class>] <object> [<is> <phase>] [<within> <duration>]
 // <createStep> => "create" <count> <class> <object>
 // <changeStep> => "change" <count> <class> <object> "from" <phase> "to" <phase>
 // <deleteStep> => "delete" <count> <class> <object>
@@ -71,6 +72,7 @@ func parseSteps(rawSteps []string) ([]*Step, error) {
 // <class>      => [A-Za-z0-9\-]+
 // <object>     => "pod[s]" | "node[s]"
 // <phase>      => "Pending" | "Running" | "Succeeded" | "Failed" | "Unknown"
+// <duration>   => time.Duration
 
 func parseStep(raw string) (*Step, error) {
 	raw = strings.ToLower(raw)
@@ -132,7 +134,7 @@ func getNext(array []string) (string, []string, error) {
 	return next, rem, nil
 }
 
-// <assertStep> => "assert" <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]
+// <assertStep> => "assert" <count> [<class>] <object> [<is> <phase>] [<within> <duration>]
 func parseAssertStep(count uint64, predicate []string) (*AssertStep, error) {
 	result := &AssertStep{Count: count}
 
@@ -140,7 +142,7 @@ func parseAssertStep(count uint64, predicate []string) (*AssertStep, error) {
 	// Check if first predicate is object
 	next, rem, err := getNext(predicate)
 	if err != nil {
-		return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]")
+		return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
 	}
 
 	obj, err := parseObject(next)
@@ -174,7 +176,7 @@ func parseAssertStep(count uint64, predicate []string) (*AssertStep, error) {
 	if next == "is" || next == "are" {
 		next, rem, err = getNext(rem)
 		if err != nil {
-			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]")
+			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
 		}
 		ph, err := parsePhase(next)
 
@@ -193,21 +195,13 @@ func parseAssertStep(count uint64, predicate []string) (*AssertStep, error) {
 	if next == "within" {
 		next, rem, err = getNext(rem)
 		if err != nil {
-			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]")
+			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
 		}
-		duration, err := parseCount(next)
+		duration, err := time.ParseDuration(next)
 		if err != nil {
-			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]")
+			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
 		}
-		next, rem, err = getNext(rem)
-		if err != nil {
-			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]")
-		}
-		if next != "seconds" {
-			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]")
-		}
-
-		result.Delay = int(duration)
+		result.Delay = duration
 	}
 
 	return result, nil
@@ -323,7 +317,7 @@ type AssertStep struct {
 	Class    Class // optional
 	Object   Object
 	PodPhase v1.PodPhase // optional
-	Delay    int
+	Delay    time.Duration
 }
 
 type CreateStep struct {

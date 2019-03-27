@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -63,32 +64,32 @@ func Test_parseAssertStep(t *testing.T) {
 			err: nil,
 		},
 		{
-			desc:      "<object> <within> <count> <seconds>",
-			predicate: []string{"pod", "within", "4", "seconds"},
+			desc:      "<object> <within> <duration>",
+			predicate: []string{"pod", "within", "4s"},
 			expectedAssert: &AssertStep{
 				Object: Pod,
-				Delay:  4,
+				Delay:  4 * time.Second,
 			},
 			err: nil,
 		},
 		{
-			desc:      "<class> <object> <within> <count> <seconds>",
-			predicate: []string{"4-cpu", "pod", "within", "4", "seconds"},
+			desc:      "<class> <object> <within> <duration>",
+			predicate: []string{"4-cpu", "pod", "within", "4s"},
 			expectedAssert: &AssertStep{
 				Class:  Class("4-cpu"),
 				Object: Pod,
-				Delay:  4,
+				Delay:  4 * time.Second,
 			},
 			err: nil,
 		},
 		{
-			desc:      "<class> <object> <is> <phase> <within> <count> <seconds>",
-			predicate: []string{"4-cpu", "pod", "is", "Running", "within", "4", "seconds"},
+			desc:      "<class> <object> <is> <phase> <within> <duration>",
+			predicate: []string{"4-cpu", "pod", "is", "Running", "within", "4s"},
 			expectedAssert: &AssertStep{
 				Class:    Class("4-cpu"),
 				Object:   Pod,
 				PodPhase: v1.PodRunning,
-				Delay:    4,
+				Delay:    4 * time.Second,
 			},
 			err: nil,
 		},
@@ -119,26 +120,26 @@ func Test_parseAssertStep(t *testing.T) {
 			err:            fmt.Errorf("phase must be one of %s, %s, %s, %s or %s: (found `Foo`)", v1.PodPending, v1.PodRunning, v1.PodSucceeded, v1.PodFailed, v1.PodUnknown),
 		},
 		{
-			desc:           "<object> <within> <count> <seconds>, invalid count",
-			predicate:      []string{"pod", "within", "foo", "seconds"},
+			desc:           "<object> <within> <duration>, invalid duration",
+			predicate:      []string{"pod", "within", "foo"},
 			expectedAssert: nil,
-			err:            fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]"),
+			err:            fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]"),
 		},
 		{
-			desc:           "<class> <object> <within> <count> <seconds>, invalid count",
-			predicate:      []string{"4-cpu", "pod", "within", "foo", "seconds"},
+			desc:           "<class> <object> <within> <duration>, invalid count",
+			predicate:      []string{"4-cpu", "pod", "within", "foo"},
 			expectedAssert: nil,
-			err:            fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]"),
+			err:            fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]"),
 		},
 		{
-			desc:           "<class> <object> <is> <phase> <within> <count> <seconds>, invalid count",
-			predicate:      []string{"4-cpu", "pod", "is", "Running", "within", "foo", "seconds"},
+			desc:           "<class> <object> <is> <phase> <within> <duration>, invalid count",
+			predicate:      []string{"4-cpu", "pod", "is", "Running", "within", "foo"},
 			expectedAssert: nil,
-			err:            fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]"),
+			err:            fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]"),
 		},
 		{
-			desc:           "<class> <is> <phase> <within> <count> <seconds>, no object",
-			predicate:      []string{"4-cpu", "is", "Running", "within", "foo", "seconds"},
+			desc:           "<class> <is> <phase> <within> <duration>, no object",
+			predicate:      []string{"4-cpu", "is", "Running", "within", "4s"},
 			expectedAssert: nil,
 			err:            fmt.Errorf("object must be either `node` or `pod`: (found `i`)"),
 		},

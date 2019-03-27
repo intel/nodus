@@ -10,11 +10,11 @@ steps:
 - "assert 2 small nodes"
 
 - "create 1 4-cpu pod"
-- "assert 1 4-cpu pod is Running within 4 seconds"
+- "assert 1 4-cpu pod is Running within 4s"
 - "delete 1 4-cpu pod"
 
 - "create 3 1-cpu pods"
-- "assert 3 1-cpu pods are Running within 4 seconds"
+- "assert 3 1-cpu pods are Running within 4s"
 
 - "change 1 1-cpu pod from Running to Succeeded"
 - "assert 0 1-cpu pods are Pending"
@@ -38,5 +38,5 @@ steps:
 
 - "delete 1 large node"
 - "delete 2 small nodes"
-- "assert 0 nodes within 2 seconds"
+- "assert 0 nodes within 2s"
 - "assert 0 pods"

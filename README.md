@@ -1,5 +1,7 @@
 # nodus podens
 
+### _P → Q, P_ ⊢ _Q_
+
 Simulated large clusters for Kubernetes scheduler validation.
 
 ## quick start

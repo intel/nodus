@@ -1,4 +1,4 @@
-# nodus ponens
+# nodus podens
 
 Simulated large clusters for Kubernetes scheduler validation.
 

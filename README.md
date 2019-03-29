@@ -4,6 +4,8 @@
 
 Simulated large clusters for Kubernetes scheduler validation.
 
+![nodus podens](https://user-images.githubusercontent.com/379372/55267148-baaea080-523d-11e9-9c63-fec89ed663a5.png)
+
 ## quick start
 
 **Build binaries**

@@ -10,7 +10,6 @@ steps:
 - "assert 2 small nodes"
 
 - "create 1 4-cpu pod"
-- "create 1 instance of job.yml"
 - "assert 1 4-cpu pod is Running within 4s"
 - "delete 1 4-cpu pod"
 

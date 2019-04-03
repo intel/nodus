@@ -383,7 +383,6 @@ func (r *runner) RunDelete(step *config.Step) error {
 		return r.deleteNode(step.Delete)
 	case config.Pod:
 		return r.deletePod(step.Delete)
-		fmt.Errorf("delete object: %s not supported", step.Delete.Object)
 	}
 
 	return fmt.Errorf("delete object: %s not supported", step.Delete.Object)

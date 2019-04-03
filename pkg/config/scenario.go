@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -62,15 +63,15 @@ func parseSteps(rawSteps []string) ([]*Step, error) {
 
 // Step grammar:
 //
-// <step>       => <assertStep> | <createStep> | <changeStep> | <deleteStep>
-// <assertStep> => "assert" <count> [<class>] <object> [<is> <phase>] [<within> <duration>]
-// <createStep> => "create" <count> <class> <object>
-// <changeStep> => "change" <count> <class> <object> "from" <phase> "to" <phase>
-// <deleteStep> => "delete" <count> <class> <object>
+// <step>        => <assertStep> | <createStep> | <changeStep> | <deleteStep>
+// <assertStep>  => "assert" <count> [<class>] <object> [<is> <phase>] [<within> <duration>]
+// <createStep>  => "create" <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )
+// <changeStep>  => "change" <count> <class> <object> "from" <phase> "to" <phase>
+// <deleteStep>  => "delete" <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )
 // <is>         => "is" | "are"
 // <count>      => [1-9][0-9]*
 // <class>      => [A-Za-z0-9\-]+
-// <object>     => "pod[s]" | "node[s]" | "job[s]"
+// <object>     => "pod[s]" | "node[s]"
 // <phase>      => "Pending" | "Running" | "Succeeded" | "Failed" | "Unknown"
 // <duration>   => time.Duration
 
@@ -207,19 +208,35 @@ func parseAssertStep(count uint64, predicate []string) (*AssertStep, error) {
 	return result, nil
 }
 
-// <createStep> => "create" <count> <class> <object>
+// <createStep> => "create" <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )
 func parseCreateStep(count uint64, predicate []string) (*CreateStep, error) {
-	if len(predicate) != 2 {
-		return nil, fmt.Errorf("syntax: create <count> <class> <object>")
+	if len(predicate) != 2 && len(predicate) != 3 {
+		return nil, fmt.Errorf("syntax: create <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )")
 	}
-	obj, err := parseObject(predicate[1])
-	if err != nil {
-		return nil, err
-	}
-	result := &CreateStep{
-		Count:  count,
-		Class:  Class(predicate[0]),
-		Object: obj,
+
+	var result *CreateStep
+	if len(predicate) == 3 {
+		instanceString := strings.TrimRight(strings.TrimSpace(predicate[0]), "s")
+		if instanceString != "instance" || predicate[1] != "of" {
+			return nil, fmt.Errorf("syntax: create <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )")
+		}
+		if !fileExists(predicate[2]) {
+			return nil, fmt.Errorf("file: %s does not exist", predicate[2])
+		}
+		result = &CreateStep{
+			Count:    count,
+			YamlPath: predicate[2],
+		}
+	} else {
+		obj, err := parseObject(predicate[1])
+		if err != nil {
+			return nil, err
+		}
+		result = &CreateStep{
+			Count:  count,
+			Class:  Class(predicate[0]),
+			Object: obj,
+		}
 	}
 	return result, nil
 }
@@ -252,19 +269,35 @@ func parseChangeStep(count uint64, predicate []string) (*ChangeStep, error) {
 	return result, nil
 }
 
-// <deleteStep> => "delete" <count> <class> <object>
+// <deleteStep> => "delete" <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )
 func parseDeleteStep(count uint64, predicate []string) (*DeleteStep, error) {
-	if len(predicate) != 2 {
-		return nil, fmt.Errorf("syntax: delete <count> <class> <object>")
+	if len(predicate) > 2 && len(predicate) == 0 {
+		return nil, fmt.Errorf("syntax: delete <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )")
 	}
-	obj, err := parseObject(predicate[1])
-	if err != nil {
-		return nil, err
-	}
-	result := &DeleteStep{
-		Count:  count,
-		Class:  Class(predicate[0]),
-		Object: obj,
+	var result *DeleteStep
+	if len(predicate) == 3 {
+		instanceString := strings.TrimRight(strings.TrimSpace(predicate[0]), "s")
+		if instanceString != "instance" || predicate[1] != "of" {
+			return nil, fmt.Errorf("syntax: delete <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )")
+		}
+
+		if !fileExists(predicate[2]) {
+			return nil, fmt.Errorf("file: %s does not exist", predicate[2])
+		}
+		result = &DeleteStep{
+			Count:    count,
+			YamlPath: predicate[2],
+		}
+	} else {
+		obj, err := parseObject(predicate[1])
+		if err != nil {
+			return nil, err
+		}
+		result = &DeleteStep{
+			Count:  count,
+			Class:  Class(predicate[0]),
+			Object: obj,
+		}
 	}
 	return result, nil
 }
@@ -277,8 +310,6 @@ func parseObject(o string) (Object, error) {
 		return Pod, nil
 	case Node:
 		return Node, nil
-	case Job:
-		return Job, nil
 	}
 	return obj, fmt.Errorf("object must be either `node` or `pod`: (found `%s`)", obj)
 }
@@ -299,6 +330,13 @@ func parsePhase(p string) (v1.PodPhase, error) {
 	}
 	return ph, fmt.Errorf("phase must be one of %s, %s, %s, %s or %s: (found `%s`)",
 		v1.PodPending, v1.PodRunning, v1.PodSucceeded, v1.PodFailed, v1.PodUnknown, ph)
+}
+
+func fileExists(f string) bool {
+	if _, err := os.Stat(f); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
 
 type Step struct {
@@ -323,9 +361,10 @@ type AssertStep struct {
 }
 
 type CreateStep struct {
-	Count  uint64
-	Class  Class
-	Object Object
+	Count    uint64
+	Class    Class
+	Object   Object
+	YamlPath string
 }
 
 type ChangeStep struct {
@@ -337,9 +376,10 @@ type ChangeStep struct {
 }
 
 type DeleteStep struct {
-	Count  uint64
-	Class  Class
-	Object Object
+	Count    uint64
+	Class    Class
+	Object   Object
+	YamlPath string
 }
 
 type Verb string
@@ -356,7 +396,6 @@ type Object string
 const (
 	Node Object = "node"
 	Pod  Object = "pod"
-	Job  Object = "job"
 )
 
 type Class string

@@ -57,22 +57,3 @@ INFO[0006] run step [25 / 25]                            description="assert 1 1
 **Tear down k8s control plane**
 
 `make k8s-down`
-
-
-**Step/Grammar Matrix**
-
-| Step              | Grammar                                                                         | Objects supported |
-|-------------------|---------------------------------------------------------------------------------|-------------------|
-| Assert            | `"assert" <count> [<class>] <object> [<is> <phase>] [<within> <count> seconds]` | Pod, Node         |
-| Create            | `"create" <count> <class> <object>`                                             | Pod, Node, Job    |
-| Change            | `"change" <count> <class> <object> "from" <phase> "to" <phase>`                 | Pod, Node         |
-| Delete            | `"delete" <count> <class> <object>`                                             | Pod, Node, Job    |
-
-
-| Predicate         | Syntax                                                        |
-|-------------------|---------------------------------------------------------------|
-| is                | `"is" | "are"`                                                |
-| count             | `[1-9][0-9]`                                                  |
-| class             | `[A-Za-z0-9\-]+`                                              |
-| object            | `"pod[s]" | "node[s]" | "job[s]"`                             |
-| phase             | `"Pending" | "Running" | "Succeeded" | "Failed" | "Unknown"`  |

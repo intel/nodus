@@ -5,6 +5,7 @@ import (
 
 	"github.com/IntelAI/nodus/pkg/client"
 	"github.com/IntelAI/nodus/pkg/config"
+	"github.com/IntelAI/nodus/pkg/dynamic"
 	"github.com/IntelAI/nodus/pkg/exec"
 	"github.com/docopt/docopt-go"
 	log "github.com/sirupsen/logrus"
@@ -14,7 +15,7 @@ func main() {
 	usage := `nptest - Test Kubernetes Scheduling Scenarios.
 
 Usage:
-  nptest --scenario=<config> --pods=<config> --nodes=<config> [--jobs=<config>] [--namespace=<ns>]
+  nptest --scenario=<config> --pods=<config> --nodes=<config> [--namespace=<ns>]
     [--master=<url> | --kubeconfig=<kconfig>] [--verbose]
   nptest -h | --help
 
@@ -23,7 +24,6 @@ Options:
   --scenario=<config>    Test scenario config file.
   --pods=<config>        Test pod config file.
   --nodes=<config>       Nodes config file.
-  --jobs=<config>		 Test job config file.
   --namespace=<ns>       Namespace to use for tests (will be created if
 	                       it does not exist) [default: default]
   --master=<url>         Kubernetes API server URL.
@@ -51,16 +51,6 @@ Options:
 		os.Exit(1)
 	}
 
-	jobConfigPath, _ := args.String("--jobs")
-	var jobConfig *config.JobConfig
-	if jobConfigPath != "" {
-		jobConfig, err = config.JobConfigFromFile(jobConfigPath)
-		if err != nil {
-			log.WithFields(log.Fields{"error": err.Error()}).Error("failed to read job config")
-			os.Exit(1)
-		}
-	}
-
 	nodeConfigPath, _ := args.String("--nodes")
 	nodeConfig, err := config.NodeConfigFromFile(nodeConfigPath)
 	if err != nil {
@@ -77,9 +67,17 @@ Options:
 		os.Exit(1)
 	}
 
+	dynamicClientSet, err := client.NewDynamicClient(master, kubeconfigPath)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct dynamic client")
+		os.Exit(1)
+	}
+
 	// construct scenario runner
 	namespace, _ := args.String("--namespace")
-	runner := exec.NewScenarioRunner(k8sclient, namespace, nodeConfig, podConfig, jobConfig)
+
+	dynamicClient := dynamic.NewDynamicClient(dynamicClientSet, k8sclient, namespace)
+	runner := exec.NewScenarioRunner(k8sclient, namespace, nodeConfig, podConfig, dynamicClient)
 	err = runner.RunScenario(scenario)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to complete scenario")

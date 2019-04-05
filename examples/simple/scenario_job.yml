@@ -1,0 +1,10 @@
+name: "cpu resource test"
+version: 1
+steps:
+- "assert 0 pods within 10s"
+
+- "create 1 large node"
+- "assert 1 large node"
+
+- "create 1 instance of examples/simple/job.yml"
+- "assert 4 job-test pods are Running within 5s"

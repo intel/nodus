@@ -3,6 +3,7 @@ package dynamic
 import (
 	"os"
 
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,27 +27,37 @@ func NewDynamicClient(dynamicClient dynamic.Interface, k8sClient kubernetes.Inte
 	}
 }
 
-func (d *DynamicClient) getResourceFromObject(object *unstructured.Unstructured) (dynamic.ResourceInterface, error) {
+func (d *DynamicClient) GetResourceFromObject(gvk schema.GroupVersionKind) (dynamic.ResourceInterface, error) {
+
 	gk := schema.GroupKind{
-		Group: object.GroupVersionKind().Group,
-		Kind:  object.GroupVersionKind().Kind,
+		Group: gvk.Group,
+		Kind:  gvk.Kind,
 	}
 
+	// Get the available resources from the client
 	groupResources, err := restmapper.GetAPIGroupResources(d.k8sclient.Discovery())
 	if err != nil {
 		return nil, err
 	}
 
+	// retrieve the required rest resource from the available mappings
 	restMapper := restmapper.NewDiscoveryRESTMapper(groupResources)
-	restMapping, err := restMapper.RESTMapping(gk, object.GroupVersionKind().Version)
+	restMapping, err := restMapper.RESTMapping(gk, gvk.Version)
 	if err != nil {
 		return nil, err
 	}
 
-	return d.client.Resource(restMapping.Resource).Namespace(d.namespace), nil
+	// create a resource of that and return it
+	resource := d.client.Resource(restMapping.Resource)
+	if restMapping.Scope.Name() == apimeta.RESTScopeNameNamespace {
+		// if namespaced, return the namespaced client
+		return resource.Namespace(d.namespace), nil
+	}
+	return resource, nil
 }
 
 func (d *DynamicClient) getUnstructuredObjectFromFile(yamlPath string) (*unstructured.Unstructured, error) {
+	// Conver the yaml into an unstructured object so that it can be consumed downstream
 	reader, err := os.Open(yamlPath)
 	if err != nil {
 		return nil, err
@@ -69,7 +80,9 @@ func (d *DynamicClient) Create(yamlPath string) error {
 	if err != nil {
 		return err
 	}
-	resourceInterface, err := d.getResourceFromObject(object)
+	// Get the group, version and kind of the new object
+	gvk := object.GroupVersionKind()
+	resourceInterface, err := d.GetResourceFromObject(gvk)
 	if err != nil {
 		return err
 	}
@@ -82,12 +95,13 @@ func (d *DynamicClient) Delete(yamlPath string) error {
 	if err != nil {
 		return err
 	}
-
-	resourceInterface, err := d.getResourceFromObject(object)
+	// Get the group, version and kind of the new object
+	gvk := object.GroupVersionKind()
+	resourceInterface, err := d.GetResourceFromObject(gvk)
 	if err != nil {
 		return err
 	}
-	propagationPolicy := metav1.DeletePropagationBackground
+	propagationPolicy := metav1.DeletePropagationForeground
 	deleteOptions := &metav1.DeleteOptions{
 		PropagationPolicy: &propagationPolicy,
 	}

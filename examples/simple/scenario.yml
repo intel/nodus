@@ -1,7 +1,7 @@
 name: "cpu resource test"
 version: 1
 steps:
-- "assert 0 pods"
+- "assert 0 pods within 10s"
 
 - "create 1 large node"
 - "assert 1 large node"
@@ -28,8 +28,4 @@ steps:
 - "assert 1 1-cpu pod is Succeeded"
 - "assert 1 1-cpu pod is Failed"
 
-- "change 1 1-cpu pod from Running to Pending"
-- "assert 1 1-cpu pod is Pending"
-- "assert 0 1-cpu pods are Running"
-- "assert 1 1-cpu pod is Succeeded"
-- "assert 1 1-cpu pod is Failed"
+- "assert 2 1-cpu pods are Succeeded within 10s"

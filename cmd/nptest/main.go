@@ -15,7 +15,7 @@ func main() {
 	usage := `nptest - Test Kubernetes Scheduling Scenarios.
 
 Usage:
-  nptest --scenario=<config> --pods=<config> --nodes=<config> [--namespace=<ns>]
+  nptest --scenario=<config> [--pods=<config>] [--nodes=<config>] [--namespace=<ns>]
     [--master=<url> | --kubeconfig=<kconfig>] [--verbose]
   nptest -h | --help
 
@@ -45,22 +45,31 @@ Options:
 	}
 
 	podConfigPath, _ := args.String("--pods")
-	podConfig, err := config.PodConfigFromFile(podConfigPath)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to read pod config")
-		os.Exit(1)
+	var podConfig *config.PodConfig
+	if podConfigPath != "" {
+		podConfig, err = config.PodConfigFromFile(podConfigPath)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err.Error()}).Error("failed to read pod config")
+			os.Exit(1)
+		}
 	}
 
 	nodeConfigPath, _ := args.String("--nodes")
-	nodeConfig, err := config.NodeConfigFromFile(nodeConfigPath)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to read node config")
-		os.Exit(1)
+	var nodeConfig *config.NodeConfig
+	if nodeConfigPath != "" {
+		nodeConfig, err = config.NodeConfigFromFile(nodeConfigPath)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err.Error()}).Error("failed to read node config")
+			os.Exit(1)
+		}
 	}
 
 	// Construct apiserver client
 	master, _ := args.String("--master")
 	kubeconfigPath, _ := args.String("--kubeconfig")
+	if master != "" {
+		kubeconfigPath = ""
+	}
 	k8sclient, err := client.NewK8sClient(master, kubeconfigPath)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct kubernetes client")

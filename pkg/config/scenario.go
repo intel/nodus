@@ -10,6 +10,7 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func ScenarioFromFile(path string) (*Scenario, error) {
@@ -64,7 +65,7 @@ func parseSteps(rawSteps []string) ([]*Step, error) {
 // Step grammar:
 //
 // <step>        => <assertStep> | <createStep> | <changeStep> | <deleteStep>
-// <assertStep>  => "assert" <count> [<class>] <object> [<is> <phase>] [<within> <duration>]
+// <assertStep>  => "assert" ( <count> [<class>] <object> [<is> <phase>] | api  <version> <kind> [<group>] ) [<within> <duration>]
 // <createStep>  => "create" <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )
 // <changeStep>  => "change" <count> <class> <object> "from" <phase> "to" <phase>
 // <deleteStep>  => "delete" <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )
@@ -85,14 +86,22 @@ func parseStep(raw string) (*Step, error) {
 	step := &Step{
 		Verb: Verb(strings.TrimSpace(parts[0])),
 	}
+
+	var count uint64
+	apiAssert := false
 	count, err := parseCount(parts[1])
 	if err != nil {
-		return nil, err
+		if parts[1] == "api" {
+			count = 0
+			apiAssert = true
+		} else {
+			return nil, err
+		}
 	}
 	predicate := parts[2:]
 	switch step.Verb {
 	case Assert:
-		a, err := parseAssertStep(count, predicate)
+		a, err := parseAssertStep(count, predicate, apiAssert)
 		if err != nil {
 			return nil, err
 		}
@@ -135,74 +144,101 @@ func getNext(array []string) (string, []string, error) {
 	return next, rem, nil
 }
 
-// <assertStep> => "assert" <count> [<class>] <object> [<is> <phase>] [<within> <duration>]
-func parseAssertStep(count uint64, predicate []string) (*AssertStep, error) {
+// <assertStep> => "assert" ( <count> [<class>] <object> [<is> <phase>] | api <version> <kind> [<group>] ) [<within> <duration>]
+func parseAssertStep(count uint64, predicate []string, apiAssert bool) (*AssertStep, error) {
 	result := &AssertStep{Count: count}
 
 	// Check for the first 2 predicates.
 	// Check if first predicate is object
 	next, rem, err := getNext(predicate)
 	if err != nil {
-		return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
+		return nil, fmt.Errorf("syntax: assert ( <count> [<class>] <object> [<is> <phase>] | api <version> <kind> [<group>] ) [<within> <duration>]")
 	}
 
-	obj, err := parseObject(next)
-	if err != nil {
-		// Check if count is provided and check if second predicate is object
-		var e error
-		next, rem, e = getNext(rem)
-		if e != nil {
-			return nil, err
+	if apiAssert {
+		result.GVK = &schema.GroupVersionKind{
+			Version: next,
 		}
-
-		obj, err = parseObject(next)
-		if err != nil {
-			return nil, err
+		next, rem, err = getNext(rem)
+		if err != nil || next == "within" {
+			return nil, fmt.Errorf("syntax: assert ( <count> [<class>] <object> [<is> <phase>] | api <version> <kind> [<group>] ) [<within> <duration>]")
 		}
+		result.GVK.Kind = next
 
-		// This means first is class
-		result.Class = Class(predicate[0])
-		result.Object = obj
-	} else {
-		// No count is provided, use object instead.
-		result.Object = obj
-	}
-
-	// Now check if either phase is provided or delay is provided.
-	next, rem, err = getNext(rem)
-	if err != nil {
-		return result, nil
-	}
-	// Check if there is a "is" or "are"
-	if next == "is" || next == "are" {
 		next, rem, err = getNext(rem)
 		if err != nil {
-			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
+			return result, nil
 		}
-		ph, err := parsePhase(next)
+		if next != "within" {
+			result.GVK.Group = next
 
-		if err == nil {
-
-			result.PodPhase = ph
 			next, rem, err = getNext(rem)
 			if err != nil {
 				return result, nil
 			}
-		} else if next != "within" {
-			return nil, err
+		}
+	} else {
+
+		obj, err := parseObject(next)
+		if err != nil {
+			// Check if count is provided and check if second predicate is object
+			var e error
+			next, rem, e = getNext(rem)
+			if e != nil {
+				return nil, err
+			}
+
+			obj, err = parseObject(next)
+			if err != nil {
+				return nil, err
+			}
+
+			// This means first is class
+			result.Class = Class(predicate[0])
+			result.Object = obj
+		} else {
+			// No count is provided, use object instead.
+			result.Object = obj
+		}
+
+		// Now check if either phase is provided or delay is provided.
+		next, rem, err = getNext(rem)
+		if err != nil {
+			return result, nil
+		}
+		// Check if there is a "is" or "are"
+		if next == "is" || next == "are" {
+			next, rem, err = getNext(rem)
+			if err != nil {
+				return nil, fmt.Errorf("syntax: assert ( <count> [<class>] <object> [<is> <phase>] | api <version> <kind> [<group>] ) [<within> <duration>]")
+			}
+			ph, err := parsePhase(next)
+
+			if err == nil {
+
+				result.PodPhase = ph
+				next, rem, err = getNext(rem)
+				if err != nil {
+					return result, nil
+				}
+			} else if next != "within" {
+				return nil, err
+			}
 		}
 	}
 	// Check if there is within
 	if next == "within" {
 		next, rem, err = getNext(rem)
 		if err != nil {
-			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
+			return nil, fmt.Errorf("syntax: assert ( <count> [<class>] <object> [<is> <phase>] | api <version> <kind> [<group>] ) [<within> <duration>]")
 		}
 		duration, err := time.ParseDuration(next)
 		if err != nil {
-			return nil, fmt.Errorf("syntax: assert <count> [<class>] <object> [<is> <phase>] [<within> <duration>]")
+			return nil, fmt.Errorf("syntax: assert ( <count> [<class>] <object> [<is> <phase>] | api <version> <kind> [<group>] ) [<within> <duration>]")
 		}
 		result.Delay = duration
+	} else if next != "" {
+		return nil, fmt.Errorf("syntax: assert ( <count> [<class>] <object> [<is> <phase>] | api <version> <kind> [<group>] ) [<within> <duration>]")
 	}
 
 	return result, nil
@@ -358,6 +394,7 @@ type AssertStep struct {
 	Object   Object
 	PodPhase v1.PodPhase // optional
 	Delay    time.Duration
+	GVK      *schema.GroupVersionKind
 }
 
 type CreateStep struct {

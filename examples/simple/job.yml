@@ -1,14 +1,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: 2-cpu-4-gang
-  annotations:
-   k8s.gang.io: "true"
+  name: job-test
 spec:
   template:
     metadata:
       labels:
-        np.class: 2-cpu-4-gang
+        np.class: job-test
         np.runDuration: 5s
         np.terminalPhase: Succeeded
     spec:

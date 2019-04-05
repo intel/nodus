@@ -1,7 +1,7 @@
 name: "Gang scheduling test"
 version: 1
 steps:
-- "assert 0 pods"
+- "assert 0 pods within 10s"
 
 - "create 1 large node"
 - "assert 1 large node"

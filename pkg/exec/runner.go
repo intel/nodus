@@ -2,6 +2,7 @@ package exec
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -145,6 +146,17 @@ func (r *runner) assertPod(assert *config.AssertStep) error {
 	return nil
 }
 
+func (r *runner) checkIfAPIAvailable(gvk *schema.GroupVersionKind) error {
+	resource, err := r.dynamicClient.GetResourceFromObject(*gvk)
+	if err != nil {
+		return err
+	}
+	// Try a simple list
+	_, err = resource.List(metav1.ListOptions{})
+
+	return err
+}
+
 func (r *runner) RunAssert(step *config.Step) error {
 	if step.Assert == nil {
 		return fmt.Errorf("there is no assert in this step.")
@@ -154,6 +166,19 @@ func (r *runner) RunAssert(step *config.Step) error {
 		Duration: 1 * time.Second,
 		Factor:   1,
 		Steps:    int(step.Assert.Delay.Seconds()),
+	}
+
+	if step.Assert.GVK != nil {
+
+		err := r.checkIfAPIAvailable(step.Assert.GVK)
+		for backoffWait.Steps > 0 {
+			if err == nil {
+				break
+			}
+			time.Sleep(backoffWait.Step())
+			err = r.checkIfAPIAvailable(step.Assert.GVK)
+		}
+		return err
 	}
 
 	switch step.Assert.Object {
@@ -184,6 +209,9 @@ func (r *runner) RunAssert(step *config.Step) error {
 func (r *runner) createNode(create *config.CreateStep) error {
 	// Supported grammar: "create" <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )
 	// Check if nodeConfig has the specified class
+	if r.nodeConfig == nil {
+		return fmt.Errorf("no node found for class: %s, please specify a nodes.yml file", create.Class)
+	}
 	for _, class := range r.nodeConfig.NodeClasses {
 		if config.Class(class.Name) == create.Class {
 			for i := uint64(0); i < create.Count; i++ {
@@ -203,7 +231,9 @@ func (r *runner) createNode(create *config.CreateStep) error {
 
 func (r *runner) createPod(create *config.CreateStep) error {
 	// Supported grammar: "create" <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )
-
+	if r.podConfig == nil {
+		return fmt.Errorf("no pod found for class: %s, please specify a pods.yml file", create.Class)
+	}
 	podClient := r.client.CoreV1().Pods(r.namespace)
 	// Check if podConfig has the specified class
 	for _, class := range r.podConfig.PodClasses {

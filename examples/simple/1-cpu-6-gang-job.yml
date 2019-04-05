@@ -27,4 +27,3 @@ spec:
       restartPolicy: Never
   parallelism: 6
   completions: 6
-  

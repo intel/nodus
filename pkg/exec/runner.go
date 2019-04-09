@@ -3,6 +3,7 @@ package exec
 import (
 	"fmt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"path"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -46,6 +47,7 @@ type runner struct {
 	gcPods        map[string]bool
 	gcNodes       map[string]bool
 	gcObjects     map[string]bool
+	workingDir    string
 }
 
 func (r *runner) cleanup() {
@@ -70,6 +72,7 @@ func (r *runner) RunScenario(scenario *config.Scenario) error {
 	log.WithFields(log.Fields{"name": scenario.Name}).Info("run scenario")
 	numSteps := len(scenario.Steps)
 	defer r.cleanup()
+	r.workingDir = scenario.WorkingDir
 	for i, step := range scenario.Steps {
 		raw := scenario.RawSteps[i]
 		log.WithFields(log.Fields{
@@ -261,6 +264,7 @@ func (r *runner) createPod(create *config.CreateStep) error {
 
 func (r *runner) createObject(create *config.CreateStep) error {
 	// Supported grammar: "create" <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )
+	create.YamlPath = path.Join(r.workingDir, create.YamlPath)
 	r.gcObjects[create.YamlPath] = true
 	return r.dynamicClient.Create(create.YamlPath)
 }
@@ -395,6 +399,7 @@ func (r *runner) deletePod(del *config.DeleteStep) error {
 }
 
 func (r *runner) deleteObject(del *config.DeleteStep) error {
+	del.YamlPath = path.Join(r.workingDir, del.YamlPath)
 	delete(r.gcObjects, del.YamlPath)
 	return r.dynamicClient.Delete(del.YamlPath)
 }

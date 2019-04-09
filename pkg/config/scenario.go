@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -18,7 +18,12 @@ func ScenarioFromFile(path string) (*Scenario, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ScenarioFromBytes(data)
+	scenario, err := ScenarioFromBytes(data)
+	if err != nil {
+		return nil, err
+	}
+	scenario.WorkingDir = filepath.Dir(path)
+	return scenario, nil
 }
 
 func ScenarioFromBytes(data []byte) (*Scenario, error) {
@@ -45,9 +50,10 @@ type Scenario struct {
 }
 
 type ScenarioYaml struct {
-	Name     string
-	Version  uint64
-	RawSteps []string `yaml:"steps"`
+	Name       string
+	Version    uint64
+	RawSteps   []string `yaml:"steps"`
+	WorkingDir string
 }
 
 func parseSteps(rawSteps []string) ([]*Step, error) {
@@ -256,9 +262,7 @@ func parseCreateStep(count uint64, predicate []string) (*CreateStep, error) {
 		if instanceString != "instance" || predicate[1] != "of" {
 			return nil, fmt.Errorf("syntax: create <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )")
 		}
-		if !fileExists(predicate[2]) {
-			return nil, fmt.Errorf("file: %s does not exist", predicate[2])
-		}
+
 		result = &CreateStep{
 			Count:    count,
 			YamlPath: predicate[2],
@@ -317,9 +321,6 @@ func parseDeleteStep(count uint64, predicate []string) (*DeleteStep, error) {
 			return nil, fmt.Errorf("syntax: delete <count> ( <class> <object> | instance[s] of <path/to/yaml/file> )")
 		}
 
-		if !fileExists(predicate[2]) {
-			return nil, fmt.Errorf("file: %s does not exist", predicate[2])
-		}
 		result = &DeleteStep{
 			Count:    count,
 			YamlPath: predicate[2],
@@ -366,13 +367,6 @@ func parsePhase(p string) (v1.PodPhase, error) {
 	}
 	return ph, fmt.Errorf("phase must be one of %s, %s, %s, %s or %s: (found `%s`)",
 		v1.PodPending, v1.PodRunning, v1.PodSucceeded, v1.PodFailed, v1.PodUnknown, ph)
-}
-
-func fileExists(f string) bool {
-	if _, err := os.Stat(f); os.IsNotExist(err) {
-		return false
-	}
-	return true
 }
 
 type Step struct {

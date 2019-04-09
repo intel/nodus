@@ -1,6 +1,6 @@
 name: "cpu resource test"
 version: 1
 steps:
-- "create 1 instance of examples/simple/crd.yml"
+- "create 1 instance of crd.yml"
 - "assert api v1 Test example.com within 5s"
-- "create 1 instance of examples/simple/cr.yml"
+- "create 1 instance of cr.yml"

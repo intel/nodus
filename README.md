@@ -50,6 +50,8 @@ INFO[0006] run step [24 / 25]                            description="assert 1 1
 INFO[0006] run step [25 / 25]                            description="assert 1 1-cpu pod is Failed"
 ```
 
+More info on scenarios [here](doc/scenario.md)
+
 **View test results and session statistics**
 
 `$ open my-test-result.html`

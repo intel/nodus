@@ -6,5 +6,5 @@ steps:
 - "create 1 large node"
 - "assert 1 large node"
 
-- "create 1 instance of examples/simple/deployment.yml"
+- "create 1 instance of deployment.yml"
 - "assert 2 deployment-test pods are Running within 5s"

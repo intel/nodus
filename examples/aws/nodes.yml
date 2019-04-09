@@ -1,0 +1,5 @@
+nodeClasses:
+- name: t3.micro
+  count: 1
+- name: g2.8xlarge
+  count: 2

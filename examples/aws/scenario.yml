@@ -1,0 +1,14 @@
+name: "aws named resource test"
+version: 1
+steps:
+- "assert 0 pods"
+
+- "create 1 t3.micro node"
+- "assert 1 t3.micro node"
+
+- "create 1 g2.8xlarge nodes"
+- "assert 1 g2.8xlarge nodes"
+
+- "create 9 4-cpu pods"
+- "assert 8 4-cpu pods are Running within 15s"
+- "assert 1 4-cpu pod is Pending"

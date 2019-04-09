@@ -3,6 +3,17 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:1497904571d9c3f4f82e06312295cb4d80d5ec2d3e13ff073e8cc187cdfd3d5a"
+  name = "github.com/cristim/ec2-instances-info"
+  packages = [
+    ".",
+    "data",
+  ]
+  pruneopts = ""
+  revision = "83e9ebdd6081baf5f657bc061fb57053e8c4b215"
+
+[[projects]]
+  branch = "master"
   digest = "1:20da7140359cab99772431cbeb195bd8cbe76312fcf6509fd8125cf91ab2847b"
   name = "github.com/docopt/docopt-go"
   packages = ["."]
@@ -128,6 +139,14 @@
   pruneopts = ""
   revision = "5f041e8faa004a95c88a202771f4cc3e991971e6"
   version = "v2.0.1"
+
+[[projects]]
+  digest = "1:1d7e1867c49a6dd9856598ef7c3123604ea3daabf5b83f303ff457bcbc410b1d"
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  pruneopts = ""
+  revision = "ba968bfe8b2f7e042a574c888954fccecfa385b4"
+  version = "v0.8.1"
 
 [[projects]]
   digest = "1:9a3c631555e0351fdc4e696577bb63afd90c399d782a8462dba9d100d7021db3"
@@ -423,6 +442,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/cristim/ec2-instances-info",
     "github.com/docopt/docopt-go",
     "github.com/sirupsen/logrus",
     "gopkg.in/yaml.v2",

@@ -1,0 +1,15 @@
+podClasses:
+  - name: 4-cpu
+    labels:
+      np.class: 4-cpu
+      np.runDuration: 30s
+      np.terminalPhase: Succeeded
+    spec:
+      containers:
+      - image: busybox
+        imagePullPolicy: IfNotPresent
+        name: c1
+        command: ["sleep", "inf"]
+        resources:
+          limits:
+            cpu: "4"

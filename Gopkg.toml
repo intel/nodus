@@ -28,6 +28,10 @@
   version = "1.0.4"
 
 [[constraint]]
+  branch = "master"
+  name = "github.com/cristim/ec2-instances-info"
+
+[[constraint]]
   version = "kubernetes-1.14.0-rc.1"
   name = "k8s.io/apimachinery"
 

@@ -23,7 +23,7 @@ k8s-down:
 	docker-compose down
 
 install_dependencies:
-	dep ensure -v
+	dep ensure
 
 test:
 	go test -v ./pkg/...

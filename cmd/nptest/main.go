@@ -3,19 +3,19 @@ package main
 import (
 	"os"
 
-	"github.com/docopt/docopt-go"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/IntelAI/nodus/pkg/client"
 	"github.com/IntelAI/nodus/pkg/config"
+	"github.com/IntelAI/nodus/pkg/dynamic"
 	"github.com/IntelAI/nodus/pkg/exec"
+	"github.com/docopt/docopt-go"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
 	usage := `nptest - Test Kubernetes Scheduling Scenarios.
 
 Usage:
-  nptest --scenario=<config> --pods=<config> --nodes=<config> [--namespace=<ns>]
+  nptest --scenario=<config> [--pods=<config>] [--nodes=<config>] [--namespace=<ns>]
     [--master=<url> | --kubeconfig=<kconfig>] [--verbose]
   nptest -h | --help
 
@@ -45,31 +45,48 @@ Options:
 	}
 
 	podConfigPath, _ := args.String("--pods")
-	podConfig, err := config.PodConfigFromFile(podConfigPath)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to read pod config")
-		os.Exit(1)
+	var podConfig *config.PodConfig
+	if podConfigPath != "" {
+		podConfig, err = config.PodConfigFromFile(podConfigPath)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err.Error()}).Error("failed to read pod config")
+			os.Exit(1)
+		}
 	}
 
 	nodeConfigPath, _ := args.String("--nodes")
-	nodeConfig, err := config.NodeConfigFromFile(nodeConfigPath)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to read node config")
-		os.Exit(1)
+	var nodeConfig *config.NodeConfig
+	if nodeConfigPath != "" {
+		nodeConfig, err = config.NodeConfigFromFile(nodeConfigPath)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err.Error()}).Error("failed to read node config")
+			os.Exit(1)
+		}
 	}
 
 	// Construct apiserver client
 	master, _ := args.String("--master")
 	kubeconfigPath, _ := args.String("--kubeconfig")
+	if master != "" {
+		kubeconfigPath = ""
+	}
 	k8sclient, err := client.NewK8sClient(master, kubeconfigPath)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct kubernetes client")
 		os.Exit(1)
 	}
 
+	dynamicClientSet, err := client.NewDynamicClient(master, kubeconfigPath)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct dynamic client")
+		os.Exit(1)
+	}
+
 	// construct scenario runner
 	namespace, _ := args.String("--namespace")
-	runner := exec.NewScenarioRunner(k8sclient, namespace, nodeConfig, podConfig)
+
+	dynamicClient := dynamic.NewDynamicClient(dynamicClientSet, k8sclient, namespace)
+	runner := exec.NewScenarioRunner(k8sclient, namespace, nodeConfig, podConfig, dynamicClient)
 	err = runner.RunScenario(scenario)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to complete scenario")

@@ -25,3 +25,9 @@ services:
     depends_on:
       - "k8s-api"
     command: "/hyperkube kube-controller-manager --master=k8s-api:8080"
+
+  nodus:
+    image: "nodus:latest"
+    depends_on:
+      - "k8s-api"
+    command: "sleep 24h"

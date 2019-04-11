@@ -1,0 +1,15 @@
+name: "cpu resource test"
+version: 1
+steps:
+- "assert api v1 Pod"
+- "assert api v1 Service"
+- "assert api v1 Namespace"
+- "assert api v1 ConfigMap"
+- "assert api v1 Secret"
+- "assert api v1 PersistentVolume"
+- "assert api v1 PersistentVolumeClaim"
+- "assert api v1 Job Batch"
+- "assert api v1 Deployment Apps"
+- "assert api v1 DaemonSet apps"
+- "assert api v1 ReplicaSet Apps"
+- "assert api v1 DaemonSet Apps"

@@ -1,7 +1,8 @@
-FROM golang:1.11
+FROM golang:1.12
 
 ADD . /go/src/github.com/IntelAI/nodus
 WORKDIR /go/src/github.com/IntelAI/nodus
-RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl \
-    && chmod +x ./kubectl \
-    && mv ./kubectl /usr/local/bin/kubectl
+
+RUN go get -u github.com/golang/dep/cmd/dep
+RUN make install_dependencies
+RUN make install

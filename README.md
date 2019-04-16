@@ -6,6 +6,10 @@ Simulated large clusters for Kubernetes scheduler validation.
 
 ![nodus podens](https://user-images.githubusercontent.com/379372/55267148-baaea080-523d-11e9-9c63-fec89ed663a5.png)
 
+**`npsim`** masquerades as many Kubelets. Define classes of nodes and how many of each you want in a few lines of yaml. When a scheduler binds pods to `nptest`'s fake Kubelets, `nptest` pretends to run them. The pods' runtime and terminal phase are driven by pod labels.
+
+**`nptest`** interprets a scenario config file provided by the user. The scenario specifies the faked behavior of nodes and pods during the run, and includes assertions to validate the scheduler's behavior.
+
 ## quick start
 
 **Build binaries**

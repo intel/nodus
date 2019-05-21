@@ -18,7 +18,6 @@ DOCKER_COMPOSE_SERVICES := $(or $(DOCKER_COMPOSE_SERVICES), etcd k8s-api k8s-sch
 k8s-up:
 	docker-compose up -d ${DOCKER_COMPOSE_SERVICES}
 	docker-compose ps
-	until nc -w 5 localhost 8080; do sleep 1; done
 
 k8s-down:
 	docker-compose down

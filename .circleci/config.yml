@@ -16,7 +16,6 @@ jobs:
              mv /tmp/docker/* /usr/bin
              curl -L https://github.com/docker/compose/releases/download/1.18.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
              chmod +x /usr/local/bin/docker-compose
-             apt update && apt install -y netcat
       - run: 
           name: build container and unit test
           command: |
@@ -25,6 +24,10 @@ jobs:
           name: bring up control plane
           command: |
              DOCKER_COMPOSE_SERVICES="etcd k8s-api k8s-controller-manager k8s-scheduler nodus" make k8s-up
+      - run:
+          name: Wait until control plane is accessible
+          command: |
+             docker-compose exec nodus bash -c "until nc -w 5 localhost 8080; do sleep 1; done"
       - run:
           name: run pods scenario
           command: |

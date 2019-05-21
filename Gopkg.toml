@@ -28,9 +28,9 @@
   version = "1.0.4"
 
 [[constraint]]
-  version = "kubernetes-1.14.0-rc.1"
+  branch = "release-1.14"
   name = "k8s.io/apimachinery"
 
 [[constraint]]
-  version = "kubernetes-1.13.0"
+  version = "kubernetes-1.14.0"
   name = "k8s.io/api"

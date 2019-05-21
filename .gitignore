@@ -1,3 +1,4 @@
 bin/
 kconfig
 kube-scheduler
+vendor

@@ -1,4 +1,4 @@
-.PHONY: k8s-up k8s-down
+.PHONY: k8s-up k8s-down kconfig
 
 all: install
 

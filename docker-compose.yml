@@ -7,7 +7,7 @@ services:
       - 2379:2379
 
   k8s-api:
-    image: "gcr.io/google-containers/hyperkube-amd64:v1.13.4"
+    image: "gcr.io/google-containers/hyperkube-amd64:v1.14.0"
     depends_on:
       - "etcd"
     command: "/hyperkube apiserver --insecure-bind-address=0.0.0.0 --etcd-servers=http://etcd:2379 --service-cluster-ip-range=10.0.0.0/16 --admission-control=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ResourceQuota"
@@ -15,13 +15,13 @@ services:
       - 8080:8080
 
   k8s-scheduler:
-    image: "gcr.io/google-containers/hyperkube-amd64:v1.13.4"
+    image: "gcr.io/google-containers/hyperkube-amd64:v1.14.0"
     depends_on:
       - "k8s-api"
     command: "/hyperkube scheduler --master=k8s-api:8080"
 
   k8s-controller-manager:
-    image: "gcr.io/google-containers/hyperkube-amd64:v1.13.4"
+    image: "gcr.io/google-containers/hyperkube-amd64:v1.14.0"
     depends_on:
       - "k8s-api"
     command: "/hyperkube kube-controller-manager --master=k8s-api:8080"

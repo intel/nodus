@@ -27,7 +27,7 @@ jobs:
       - run:
           name: Wait until control plane is accessible
           command: |
-             docker-compose exec nodus bash -c "until nc -w 5 localhost 8080; do sleep 1; done"
+             docker-compose exec nodus bash -c "until nc -w 5 k8s-api 8080; do sleep 1; done"
       - run:
           name: run pods scenario
           command: |

@@ -32,5 +32,5 @@
   name = "k8s.io/apimachinery"
 
 [[constraint]]
-  version = "kubernetes-1.14.0"
+  version = "kubernetes-1.14.1"
   name = "k8s.io/api"

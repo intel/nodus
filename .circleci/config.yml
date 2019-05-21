@@ -27,7 +27,7 @@ jobs:
       - run:
           name: run pods scenario
           command: |
-             docker-compose exec nodus bash -c "sleep 5 && nptest --scenario=examples/simple/scenario.yml --pods=examples/simple/pods.yml --nodes=examples/simple/nodes.yml --master=k8s-api:8080"
+             docker-compose exec nodus bash -c "nptest --scenario=examples/simple/scenario.yml --pods=examples/simple/pods.yml --nodes=examples/simple/nodes.yml --master=k8s-api:8080"
       - run:
           name: run crd scenario
           command: |

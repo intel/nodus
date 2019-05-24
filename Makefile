@@ -1,4 +1,4 @@
-.PHONY: k8s-up k8s-down
+.PHONY: k8s-up k8s-down kconfig
 
 all: install
 
@@ -39,7 +39,7 @@ scheduler-run:
 	./kube-scheduler --master=${APISERVER} -v ${SCHEDULER_VERBOSITY}
 
 kconfig:
-ifeq ($(UNAME_S), Darwin)
+ifdef DOCKER_MACHINE_NAME
 	@echo "Building docker-machine config"
 	@scripts/docker-machine-config.sh
 else

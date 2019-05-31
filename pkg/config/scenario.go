@@ -33,7 +33,7 @@ func ScenarioFromBytes(data []byte) (*Scenario, error) {
 		return nil, err
 	}
 
-	steps, err := parseSteps(sy.RawSteps)
+	steps, err := ParseSteps(sy.RawSteps)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse: %s", err.Error())
 	}
@@ -59,7 +59,7 @@ type ScenarioYaml struct {
 func parseSteps(rawSteps []string) ([]*Step, error) {
 	steps := []*Step{}
 	for i, raw := range rawSteps {
-		step, err := parseStep(raw)
+		step, err := ParseStep(raw)
 		if err != nil {
 			return nil, fmt.Errorf("step [%d]: %s (input: `%s`", i, err.Error(), raw)
 		}
@@ -82,7 +82,7 @@ func parseSteps(rawSteps []string) ([]*Step, error) {
 // <phase>      => "Pending" | "Running" | "Succeeded" | "Failed" | "Unknown"
 // <duration>   => time.Duration
 
-func parseStep(raw string) (*Step, error) {
+func ParseStep(raw string) (*Step, error) {
 	raw = strings.ToLower(raw)
 	parts := strings.Split(raw, " ")
 	if len(parts) < 3 {

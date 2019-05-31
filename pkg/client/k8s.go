@@ -22,7 +22,6 @@ func NewClientConfig(master string, kubeconfigPath string) (*restclient.Config, 
 }
 
 func NewK8sClient(master string, kubeconfigPath string) (*kubernetes.Clientset, error) {
-
 	kconfig, err := NewClientConfig(master, kubeconfigPath)
 	if err != nil {
 		return nil, err

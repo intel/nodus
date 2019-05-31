@@ -50,7 +50,7 @@ type runner struct {
 	workingDir    string
 }
 
-func (r *runner) cleanup() {
+func (r *runner) Shutdown() {
 	log.Info("Cleaning up resources")
 	podClient := r.client.CoreV1().Pods(r.namespace)
 	deleteOptions := &metav1.DeleteOptions{}
@@ -71,32 +71,34 @@ func (r *runner) cleanup() {
 func (r *runner) RunScenario(scenario *config.Scenario) error {
 	log.WithFields(log.Fields{"name": scenario.Name}).Info("run scenario")
 	numSteps := len(scenario.Steps)
-	defer r.cleanup()
+	defer r.Shutdown()
 	r.workingDir = scenario.WorkingDir
 	for i, step := range scenario.Steps {
 		raw := scenario.RawSteps[i]
 		log.WithFields(log.Fields{
 			"description": raw,
 		}).Infof("run step [%d / %d]", i+1, numSteps)
-
-		var err error
-		switch step.Verb {
-		case config.Assert:
-			err = r.RunAssert(step)
-		case config.Create:
-			err = r.RunCreate(step)
-		case config.Change:
-			err = r.RunChange(step)
-		case config.Delete:
-			err = r.RunDelete(step)
-		default:
-			err = fmt.Errorf("unknown verb `%s`", step.Verb)
-		}
-		if err != nil {
+		if err := RunStep(step); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (r *runner) RunStep(step *config.Step) error {
+	var err error
+	switch step.Verb {
+	case config.Assert:
+		err = r.RunAssert(step)
+	case config.Create:
+		err = r.RunCreate(step)
+	case config.Change:
+		err = r.RunChange(step)
+	case config.Delete:
+		err = r.RunDelete(step)
+	default:
+		err = fmt.Errorf("unknown verb `%s`", step.Verb)
+	}
 }
 
 func (r *runner) assertNode(assert *config.AssertStep) error {

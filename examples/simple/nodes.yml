@@ -1,6 +1,6 @@
 nodeClasses:
 - name: large
-  count: 1
+  count: 40
   labels:
     nodus-ponens: true
     np.class: large

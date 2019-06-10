@@ -11,8 +11,16 @@ steps:
 
 # Available CPUs: 1 (node) * 8 (CPU) + 2 (nodes) * 2 (CPU)
 # Trying to schedule 2 gangs, one gang requesting 2(pods)*4(cpu) and other requesting 6(pods)*1(cpu)
-- "create 1 instance of 2-cpu-4-gang-job.yml"
-- "create 1 instance of 1-cpu-6-gang-job.yml"
+- "create 1 instance of 2-cpu-4-gang-pod-1.yml"
+- "create 1 instance of 2-cpu-4-gang-pod-2.yml"
+- "create 1 instance of 2-cpu-4-gang-pod-3.yml"
+- "create 1 instance of 2-cpu-4-gang-pod-4.yml"
+- "create 1 instance of 1-cpu-6-gang-pod-1.yml"
+- "create 1 instance of 1-cpu-6-gang-pod-2.yml"
+- "create 1 instance of 1-cpu-6-gang-pod-3.yml"
+- "create 1 instance of 1-cpu-6-gang-pod-4.yml"
+- "create 1 instance of 1-cpu-6-gang-pod-5.yml"
+- "create 1 instance of 1-cpu-6-gang-pod-6.yml"
 
 - "assert 0 1-cpu-6-gang pods are Running"
 - "assert 4 2-cpu-4-gang pods are Running within 10s"

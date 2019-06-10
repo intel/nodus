@@ -1,0 +1,27 @@
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: 1-cpu-6-gang-pod-6
+  annotations:
+    scheduling.k8s.io/group-name: "pg1"
+  labels:
+    np.class: 1-cpu-6-gang
+    np.runDuration: 5s
+    np.terminalPhase: Succeeded
+spec:
+  schedulerName: kube-nnpt-scheduler
+  tolerations:
+    - key: node.kubernetes.io/unreachable
+      effect: NoSchedule
+  containers:
+  - name: test1
+    image: ubuntu:latest
+    imagePullPolicy: IfNotPresent
+    command: [ "/bin/bash", "-c", "--" ]
+    args: [ "while true; do sleep 30; done;" ]
+    resources:
+      requests:
+        cpu: 1
+        memory: 128Mi
+  restartPolicy: Never

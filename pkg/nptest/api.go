@@ -1,22 +1,37 @@
 package nptest
 
 import (
+	"os"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
+	"k8s.io/client-go/kubernetes"
 
+	"github.com/IntelAI/nodus/pkg/client"
 	"github.com/IntelAI/nodus/pkg/config"
+	"github.com/IntelAI/nodus/pkg/dynamic"
+	"github.com/IntelAI/nodus/pkg/exec"
 )
 
-func New(namespace string, nodeConfig *config.NodeConfig, podConfig *config.PodConfig) NPTest {
+func New(namespace string, master string, kubeconfigPath string, nodeConfig *config.NodeConfig, podConfig *config.PodConfig) NPTest {
 	// construct clients
-	var client *kubernetes.Clientset
-	var dynamicClient *dynamic.DynamicClient
+	k8sclient, err := client.NewK8sClient(master, kubeconfigPath)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct kubernetes client")
+		os.Exit(1)
+	}
 
-	runner := NewScenarioRunner(client, namespace, nodeConfig, podConfig, dynamicClient)
+	dynamicClientSet, err := client.NewDynamicClient(master, kubeconfigPath)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct dynamic client")
+		os.Exit(1)
+	}
+	dynamicClient := dynamic.NewDynamicClient(dynamicClientSet, k8sclient, namespace)
+
+	runner := exec.NewScenarioRunner(k8sclient, namespace, nodeConfig, podConfig, dynamicClient)
 
 	return &nptest{
-		client: client,
+		client: k8sclient,
 		runner: runner,
 	}
 }
@@ -37,7 +52,7 @@ func (np *nptest) Shutdown() {
 }
 
 func (np *nptest) Run(step string) error {
-	log.WithFields("[nptest] run step", log.Fields{"raw": step})
+	log.WithFields(log.Fields{"raw": step}).Info("[nptest] run step")
 	s, err := config.ParseStep(step)
 	if err != nil {
 		return err

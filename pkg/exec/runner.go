@@ -2,9 +2,10 @@ package exec
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"path"
 	"time"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
@@ -23,6 +24,8 @@ type ScenarioRunner interface {
 	RunCreate(step *config.Step) error
 	RunChange(step *config.Step) error
 	RunDelete(step *config.Step) error
+	RunStep(step *config.Step) error
+	Shutdown()
 }
 
 func NewScenarioRunner(client *kubernetes.Clientset, namespace string, nodeConfig *config.NodeConfig, podConfig *config.PodConfig, dynamicClient *dynamic.DynamicClient) ScenarioRunner {
@@ -78,7 +81,7 @@ func (r *runner) RunScenario(scenario *config.Scenario) error {
 		log.WithFields(log.Fields{
 			"description": raw,
 		}).Infof("run step [%d / %d]", i+1, numSteps)
-		if err := RunStep(step); err != nil {
+		if err := r.RunStep(step); err != nil {
 			return err
 		}
 	}
@@ -99,6 +102,8 @@ func (r *runner) RunStep(step *config.Step) error {
 	default:
 		err = fmt.Errorf("unknown verb `%s`", step.Verb)
 	}
+
+	return err
 }
 
 func (r *runner) assertNode(assert *config.AssertStep) error {
@@ -119,9 +124,8 @@ func (r *runner) assertNode(assert *config.AssertStep) error {
 	if nodeList.Items == nil || uint64(len(nodeList.Items)) != assert.Count {
 		if assert.Class != "" {
 			return fmt.Errorf("found %d nodes of class %s, but %d expected", len(nodeList.Items), assert.Class, assert.Count)
-		} else {
-			return fmt.Errorf("found %d nodes but %d expected", len(nodeList.Items), assert.Count)
 		}
+		return fmt.Errorf("found %d nodes but %d expected", len(nodeList.Items), assert.Count)
 	}
 	return nil
 }

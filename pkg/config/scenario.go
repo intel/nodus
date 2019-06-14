@@ -56,7 +56,7 @@ type ScenarioYaml struct {
 	WorkingDir string
 }
 
-func parseSteps(rawSteps []string) ([]*Step, error) {
+func ParseSteps(rawSteps []string) ([]*Step, error) {
 	steps := []*Step{}
 	for i, raw := range rawSteps {
 		step, err := ParseStep(raw)

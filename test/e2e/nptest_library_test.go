@@ -1,12 +1,24 @@
 package e2e
 
 import (
-	"github.com/IntelAI/nodus/pkg/nptest"
 	"testing"
+
+	"github.com/IntelAI/nodus/pkg/config"
+	"github.com/IntelAI/nodus/pkg/nptest"
 )
 
 func TestNPTestLibrary(t *testing.T) {
-	np := nptest.New()
+	nodeConfig, err := config.NodeConfigFromFile("../../examples/simple/nodes.yml")
+	if err != nil {
+		t.Fatal("could not parse node config from example nodes file")
+	}
+
+	podConfig, _ := config.PodConfigFromFile("../../examples/simple/pods.yml")
+	if err != nil {
+		t.Fatal("could not parse pods config from example pods file")
+	}
+
+	np := nptest.New("default", "", "../../kconfig", nodeConfig, podConfig)
 	defer np.Shutdown()
 
 	np.Test(t, "assert 0 pods within 10s")

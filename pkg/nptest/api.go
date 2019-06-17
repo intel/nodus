@@ -13,15 +13,15 @@ import (
 	"github.com/IntelAI/nodus/pkg/exec"
 )
 
-func New(namespace string, master string, kubeconfigPath string, nodeConfig *config.NodeConfig, podConfig *config.PodConfig) NPTest {
+func New(namespace string, kubeInfo config.KubeInfo, nodeConfig *config.NodeConfig, podConfig *config.PodConfig) NPTest {
 	// construct clients
-	k8sclient, err := client.NewK8sClient(master, kubeconfigPath)
+	k8sclient, err := client.NewK8sClient(kubeInfo.Master, kubeInfo.KconfigPath)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct kubernetes client")
 		os.Exit(1)
 	}
 
-	dynamicClientSet, err := client.NewDynamicClient(master, kubeconfigPath)
+	dynamicClientSet, err := client.NewDynamicClient(kubeInfo.Master, kubeInfo.KconfigPath)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct dynamic client")
 		os.Exit(1)

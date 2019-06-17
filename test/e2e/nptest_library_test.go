@@ -92,7 +92,12 @@ func TestNPTestLibrary(t *testing.T) {
 		},
 	}}
 
-	np := nptest.New("default", "", "../../kconfig", nodeConfig, podConfig)
+	kubeInfo, err := config.KubeInfoFromEnv()
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	np := nptest.New("default", kubeInfo, nodeConfig, podConfig)
 	defer np.Shutdown()
 
 	np.Test(t, "assert 0 pods within 10s")

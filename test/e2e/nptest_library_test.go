@@ -3,20 +3,94 @@ package e2e
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"github.com/IntelAI/nodus/pkg/config"
 	"github.com/IntelAI/nodus/pkg/nptest"
 )
 
 func TestNPTestLibrary(t *testing.T) {
-	nodeConfig, err := config.NodeConfigFromFile("../../examples/simple/nodes.yml")
-	if err != nil {
-		t.Fatal("could not parse node config from example nodes file")
-	}
+	nodeConfig := &config.NodeConfig{NodeClasses: []config.NodeClass{
+		config.NodeClass{
+			Name:  "large",
+			Count: 40,
+			Labels: map[string]string{
+				"nodus-ponens": "true",
+				"np.class":     "large",
+			},
+			Resources: config.NodeResources{
+				Capacity: map[string]string{
+					"cpu":    "8",
+					"memory": "128Gi",
+				},
+				Allocatable: map[string]string{
+					"cpu":    "8",
+					"memory": "128Gi",
+				},
+			},
+		},
+		config.NodeClass{
+			Name:  "small",
+			Count: 2,
+			Labels: map[string]string{
+				"nodus-ponens": "true",
+				"np.class":     "small",
+			},
+			Resources: config.NodeResources{
+				Capacity: map[string]string{
+					"cpu":    "8",
+					"memory": "8Gi",
+				},
+				Allocatable: map[string]string{
+					"cpu":    "8",
+					"memory": "8Gi",
+				},
+			},
+		},
+	}}
 
-	podConfig, _ := config.PodConfigFromFile("../../examples/simple/pods.yml")
-	if err != nil {
-		t.Fatal("could not parse pods config from example pods file")
-	}
+	podConfig := &config.PodConfig{PodClasses: []config.PodClass{
+		config.PodClass{
+			Name: "4-cpu",
+			Labels: map[string]string{
+				"np.class":         "4-cpu",
+				"np.runDuration":   "3s",
+				"np.terminalPhase": "Succeeded",
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{corev1.Container{
+					Image:           "busybox",
+					ImagePullPolicy: "IfNotPresent",
+					Name:            "c1",
+					Command:         []string{"sleep", "inf"},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{"cpu": resource.MustParse("4")},
+					},
+				}},
+			},
+		},
+		config.PodClass{
+			Name: "1-cpu",
+			Labels: map[string]string{
+				"np.class":         "1-cpu",
+				"np.runDuration":   "10s",
+				"np.terminalPhase": "Succeeded",
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{corev1.Container{
+					Image:           "busybox",
+					ImagePullPolicy: "IfNotPresent",
+					Name:            "c1",
+					Command:         []string{"sleep", "inf"},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{"cpu": resource.MustParse("1")},
+					},
+				}},
+			},
+		},
+	}}
 
 	np := nptest.New("default", "", "../../kconfig", nodeConfig, podConfig)
 	defer np.Shutdown()

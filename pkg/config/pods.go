@@ -48,7 +48,6 @@ type PodConfig struct {
 
 type PodClass struct {
 	Name   string
-	Count  uint
 	Labels map[string]string
 	Spec   corev1.PodSpec
 }

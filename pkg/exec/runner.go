@@ -3,6 +3,7 @@ package exec
 import (
 	"fmt"
 	"path"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -75,6 +76,21 @@ func (r *runner) RunScenario(scenario *config.Scenario) error {
 	log.WithFields(log.Fields{"name": scenario.Name}).Info("run scenario")
 	numSteps := len(scenario.Steps)
 	defer r.Shutdown()
+
+	// create namespace if it doesn't exist
+	_, err := r.client.CoreV1().Namespaces().Get(r.namespace, metav1.GetOptions{})
+	if err != nil {
+		if !strings.HasSuffix(err.Error(), "not found") {
+			return fmt.Errorf("unable to get namespace %s: %s", r.namespace, err.Error())
+		}
+		log.WithFields(log.Fields{"name": scenario.Name}).Info("attempting to create namespace")
+		ns := &corev1.Namespace{}
+		ns.ObjectMeta.Name = r.namespace
+		if _, err := r.client.CoreV1().Namespaces().Create(ns); err != nil {
+			return fmt.Errorf("unable to create namespace %s: %s", r.namespace, err.Error())
+		}
+	}
+
 	r.workingDir = scenario.WorkingDir
 	for i, step := range scenario.Steps {
 		raw := scenario.RawSteps[i]

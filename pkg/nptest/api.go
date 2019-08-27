@@ -21,6 +21,18 @@ func New(namespace string, kubeInfo config.KubeInfo, nodeConfig *config.NodeConf
 		os.Exit(1)
 	}
 
+	heartbeat, err := client.NewK8sHeartbeatClient(kubeInfo.Master, kubeInfo.KconfigPath)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct heartbeat client")
+		os.Exit(1)
+	}
+
+	events, err := client.NewK8sEventClient(kubeInfo.Master, kubeInfo.KconfigPath)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct event client")
+		os.Exit(1)
+	}
+	
 	dynamicClientSet, err := client.NewDynamicClient(kubeInfo.Master, kubeInfo.KconfigPath)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct dynamic client")
@@ -28,7 +40,7 @@ func New(namespace string, kubeInfo config.KubeInfo, nodeConfig *config.NodeConf
 	}
 	dynamicClient := dynamic.NewDynamicClient(dynamicClientSet, k8sclient, namespace)
 
-	runner := exec.NewScenarioRunner(k8sclient, namespace, nodeConfig, podConfig, dynamicClient)
+	runner := exec.NewScenarioRunner(k8sclient, heartbeat, events, namespace, nodeConfig, podConfig, dynamicClient)
 
 	return &nptest{
 		client: k8sclient,

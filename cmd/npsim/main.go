@@ -9,7 +9,7 @@ import (
 	"github.com/docopt/docopt-go"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
-
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"		
 	"github.com/IntelAI/nodus/pkg/client"
 	"github.com/IntelAI/nodus/pkg/config"
 	"github.com/IntelAI/nodus/pkg/node"
@@ -49,12 +49,25 @@ Options:
 	// Construct apiserver client
 	master, _ := args.String("--master")
 	kubeconfigPath, _ := args.String("--kubeconfig")
-	client, err := client.NewK8sClient(master, kubeconfigPath)
+	cl, err := client.NewK8sClient(master, kubeconfigPath)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct kubernetes client")
 		os.Exit(1)
 	}
 
+	heartbeat, err := client.NewK8sHeartbeatClient(master, kubeconfigPath)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct kubernetes client")
+		os.Exit(1)
+	}
+
+	events, err := client.NewK8sEventClient(master, kubeconfigPath)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct events client")
+		os.Exit(1)
+	}
+	
+	
 	// Subscribe to interrupt and terminate signals
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
@@ -62,7 +75,7 @@ Options:
 	log.Info("Creating nodes...")
 
 	nodes := makeNodes(nodeConfig)
-	err = start(nodes, client)
+	err = start(nodes, cl, heartbeat, events)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to start nodes")
 		os.Exit(1)
@@ -91,9 +104,9 @@ func makeNodes(nodeConfig *config.NodeConfig) []node.FakeNode {
 	return nodes
 }
 
-func start(nodes []node.FakeNode, client *kubernetes.Clientset) (err error) {
+func start(nodes []node.FakeNode, client *kubernetes.Clientset, heartbeat *kubernetes.Clientset, events v1core.EventsGetter) (err error) {
 	for _, n := range nodes {
-		if err = n.Start(client); err != nil {
+		if err = n.Start(client, heartbeat, events); err != nil {
 			log.WithFields(log.Fields{
 				"node":  n.Name(),
 				"error": err.Error(),

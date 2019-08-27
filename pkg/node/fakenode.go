@@ -6,12 +6,20 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	// "k8s.io/kubernetes/pkg/kubelet/events"		
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/wait"	
+	"k8s.io/apimachinery/pkg/types"	
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-
+	"k8s.io/client-go/tools/record"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"		
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"github.com/IntelAI/nodus/pkg/config"
+	"k8s.io/klog"
+    // "encoding/json"	
 )
 
 const NodeClassLabel = "np.class"
@@ -33,20 +41,23 @@ func NewFakeNode(name string, class string, labels map[string]string, resources 
 type FakeNode interface {
 	Name() string
 	Class() string
-	Start(client *kubernetes.Clientset) error
+	Start(kubeClient *kubernetes.Clientset, heartbeatClient *kubernetes.Clientset, eventClient v1core.EventsGetter) error
 	Stop() error
 }
 
 type fakeNode struct {
 	name      string
 	class     string
-	client    *kubernetes.Clientset
+	kubeClient       *kubernetes.Clientset
+	heartbeatClient  *kubernetes.Clientset
 	node      *v1.Node
+	nodeRef   *v1.ObjectReference
 	labels    map[string]string
 	resources config.NodeResources
 	pods      PodSet
 	podWatch  watch.Interface
 	done      chan struct{}
+	recorder  record.EventRecorder
 }
 
 func (n *fakeNode) Name() string {
@@ -57,14 +68,32 @@ func (n *fakeNode) Class() string {
 	return n.class
 }
 
-func (n *fakeNode) Start(client *kubernetes.Clientset) error {
-	n.client = client
+func (n *fakeNode) Start(kubeClient *kubernetes.Clientset, heartbeatClient *kubernetes.Clientset, eventClient v1core.EventsGetter) error {
+	n.kubeClient = kubeClient
+	n.heartbeatClient = heartbeatClient
+
+	n.nodeRef = &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string(n.name),
+		UID:       types.UID(n.name),
+		Namespace: "",
+	}
+	
+	eventBroadcaster := record.NewBroadcaster()
+	n.recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "kubelet", Host: string(n.name)})
+	eventBroadcaster.StartLogging(klog.V(3).Infof)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: eventClient.Events("")})
+	
 	err := n.startWatchingPods()
 	if err != nil {
 		return err
 	}
 	n.startUpdatingPods()
-	return n.register()
+	n.register()
+
+	n.startNodeStatusUpdates()
+	// n.setNodeStatus()
+	return nil
 }
 
 func (n *fakeNode) Stop() error {
@@ -79,12 +108,69 @@ func (n *fakeNode) register() error {
 		return err
 	}
 	n.node = node
-	node, err = n.client.CoreV1().Nodes().Create(node)
+	node, err = n.kubeClient.CoreV1().Nodes().Create(node)
 	if err != nil {
 		return err
 	}
 	n.node = node
+
+	currentTime := metav1.NewTime(time.Now())
+
+	newNodeReadyCondition := v1.NodeCondition{
+		Type:              v1.NodeReady,
+		Status:            v1.ConditionTrue,
+		Reason:            "KubeletReady",
+		Message:           "kubelet is posting ready status",
+		LastHeartbeatTime: currentTime,
+		LastTransitionTime: currentTime,
+	}
+	n.node.Status.Conditions = append(n.node.Status.Conditions, newNodeReadyCondition)
+	
+	memoryPressureCondition := v1.NodeCondition{
+	    Type:               v1.NodeMemoryPressure,
+	    Status:             v1.ConditionFalse,
+		Reason:             "KubeletHasInsufficientMemory",
+		Message:            "kubelet has insufficient memory available",
+		LastTransitionTime:  currentTime,
+	}
+	n.node.Status.Conditions = append(n.node.Status.Conditions, memoryPressureCondition)
+
+	pidPressureCondition := v1.NodeCondition{
+	    Type:               v1.NodePIDPressure,
+	    Status:             v1.ConditionFalse,
+		Reason:             "KubeletHasSufficientPID",
+		Message:            "kubelet has sufficient PID available",
+		LastTransitionTime:  currentTime,
+	}
+	n.node.Status.Conditions = append(n.node.Status.Conditions, pidPressureCondition)
+
+	diskPressureCondition := v1.NodeCondition{
+	    Type:               v1.NodeDiskPressure,
+	    Status:             v1.ConditionFalse,
+		Reason:             "KubeletHasNoDiskPressure",
+		Message:            "kubelet has no disk pressure",
+		LastTransitionTime:  currentTime,
+	}
+	n.node.Status.Conditions = append(n.node.Status.Conditions, diskPressureCondition)
+	
 	return nil
+}
+
+func (n *fakeNode) startNodeStatusUpdates() error {
+	go wait.Until(n.setNodeStatus, 30 * time.Second, wait.NeverStop)
+	return nil
+}
+
+func (n *fakeNode) setNodeStatus() {
+	// Patch the current status on the API server
+
+
+	for i := range n.node.Status.Conditions {
+		err := nodeutil.SetNodeCondition(n.heartbeatClient, types.NodeName(n.name), n.node.Status.Conditions[i])
+		if err != nil {
+			log.Error("Unable to update node condition: %v", err)
+		}
+	}	
 }
 
 func (n *fakeNode) startWatchingPods() error {
@@ -94,7 +180,7 @@ func (n *fakeNode) startWatchingPods() error {
 		FieldSelector: fmt.Sprintf("spec.nodeName=%s", n.name),
 	}
 	namespace := ""
-	podWatch, err := n.client.CoreV1().Pods(namespace).Watch(lOpts)
+	podWatch, err := n.kubeClient.CoreV1().Pods(namespace).Watch(lOpts)
 	if err != nil {
 		return err
 	}
@@ -170,7 +256,7 @@ func (n *fakeNode) finalizeDeletedPod(pod *v1.Pod) {
 	log.WithFields(log.Fields{"node": n.name, "pod": pod.Name}).Debug("finalizing pod")
 	gracePeriod := int64(0)
 	opts := &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}
-	n.client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, opts)
+	n.kubeClient.CoreV1().Pods(pod.Namespace).Delete(pod.Name, opts)
 }
 
 func (n *fakeNode) unregister() error {
@@ -181,7 +267,7 @@ func (n *fakeNode) unregister() error {
 	// Delete this node immediately
 	gracePeriod := int64(0)
 	opts := &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}
-	return n.client.CoreV1().Nodes().Delete(n.name, opts)
+	return n.kubeClient.CoreV1().Nodes().Delete(n.name, opts)
 }
 
 // Updates the list of pods to the desired phase, on a best-effort basis.
@@ -192,7 +278,7 @@ func (n *fakeNode) tryUpdatePodPhase(phase v1.PodPhase, pods ...*v1.Pod) {
 	for _, pod := range pods {
 		originalPhase := pod.Status.Phase
 
-		podClient := n.client.CoreV1().Pods(pod.Namespace)
+		podClient := n.kubeClient.CoreV1().Pods(pod.Namespace)
 
 		var copy v1.Pod
 		copy = *pod
@@ -292,12 +378,12 @@ func (n *fakeNode) k8sNode() (*v1.Node, error) {
 			Allocatable: allocatable,
 			Phase:       v1.NodeRunning,
 			Addresses:   []v1.NodeAddress{},
-			Conditions: []v1.NodeCondition{
-				v1.NodeCondition{
-					Type:   v1.NodeReady,
-					Status: v1.ConditionTrue,
-				},
-			},
+			Conditions: []v1.NodeCondition{},
+			// 	v1.NodeCondition{
+			// 		Type:   v1.NodeReady,
+			// 		Status: v1.ConditionTrue,
+			// 	},
+			// },
 		},
 	}
 

@@ -80,9 +80,7 @@ func (n *fakeNode) Start(kubeClient *kubernetes.Clientset, heartbeatClient *kube
 	n.startUpdatingPods()
 	n.register()
 
-	n.startNodeStatusUpdates()
-	// n.setNodeStatus()
-	return nil
+	return n.startNodeStatusUpdates()
 }
 
 func (n *fakeNode) Stop() error {
@@ -103,45 +101,6 @@ func (n *fakeNode) register() error {
 	}
 	n.node = node
 
-	currentTime := metav1.NewTime(time.Now())
-
-	newNodeReadyCondition := v1.NodeCondition{
-		Type:              v1.NodeReady,
-		Status:            v1.ConditionTrue,
-		Reason:            "KubeletReady",
-		Message:           "kubelet is posting ready status",
-		LastHeartbeatTime: currentTime,
-		LastTransitionTime: currentTime,
-	}
-	n.node.Status.Conditions = append(n.node.Status.Conditions, newNodeReadyCondition)
-	
-	memoryPressureCondition := v1.NodeCondition{
-	    Type:               v1.NodeMemoryPressure,
-	    Status:             v1.ConditionFalse,
-		Reason:             "KubeletHasInsufficientMemory",
-		Message:            "kubelet has insufficient memory available",
-		LastTransitionTime:  currentTime,
-	}
-	n.node.Status.Conditions = append(n.node.Status.Conditions, memoryPressureCondition)
-
-	pidPressureCondition := v1.NodeCondition{
-	    Type:               v1.NodePIDPressure,
-	    Status:             v1.ConditionFalse,
-		Reason:             "KubeletHasSufficientPID",
-		Message:            "kubelet has sufficient PID available",
-		LastTransitionTime:  currentTime,
-	}
-	n.node.Status.Conditions = append(n.node.Status.Conditions, pidPressureCondition)
-
-	diskPressureCondition := v1.NodeCondition{
-	    Type:               v1.NodeDiskPressure,
-	    Status:             v1.ConditionFalse,
-		Reason:             "KubeletHasNoDiskPressure",
-		Message:            "kubelet has no disk pressure",
-		LastTransitionTime:  currentTime,
-	}
-	n.node.Status.Conditions = append(n.node.Status.Conditions, diskPressureCondition)
-	
 	return nil
 }
 
@@ -367,14 +326,38 @@ func (n *fakeNode) k8sNode() (*v1.Node, error) {
 			Allocatable: allocatable,
 			Phase:       v1.NodeRunning,
 			Addresses:   []v1.NodeAddress{},
-			Conditions: []v1.NodeCondition{},
-			// 	v1.NodeCondition{
-			// 		Type:   v1.NodeReady,
-			// 		Status: v1.ConditionTrue,
-			// 	},
-			// },
+			Conditions: []v1.NodeCondition{
+				v1.NodeCondition{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+					Reason: "KubeletReady",
+					Message: "kubelet is posting ready status",
+					LastTransitionTime: metav1.Now(),					
+				},
+				v1.NodeCondition{
+					Type: v1.NodeMemoryPressure,
+					Status: v1.ConditionFalse,
+					Reason: "KubeletHasInsufficientMemory",
+					Message: "kubelet has insufficient memory available",
+					LastTransitionTime: metav1.Now(),
+				},
+				v1.NodeCondition{
+					Type: v1.NodePIDPressure,
+					Status: v1.ConditionFalse,
+					Reason: "KubeletHasSufficientPID",
+					Message: "kubelet has sufficient PID available",
+					LastTransitionTime: metav1.Now(),
+				},
+				v1.NodeCondition{
+					Type: v1.NodeDiskPressure,
+					Status: v1.ConditionFalse,
+					Reason: "KubeletHasNoDiskPressure",
+					Message: "kubelet has no disk pressure",
+					LastTransitionTime: metav1.Now(),
+				},				
+			},
 		},
-	}
-
+	}	
+	
 	return &node, nil
 }

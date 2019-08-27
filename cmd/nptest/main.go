@@ -82,12 +82,6 @@ Options:
 		os.Exit(1)
 	}
 
-	events, err := client.NewK8sEventClient(master, kubeconfigPath)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct event client")
-		os.Exit(1)
-	}
-	
 	dynamicClientSet, err := client.NewDynamicClient(master, kubeconfigPath)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct dynamic client")
@@ -98,7 +92,7 @@ Options:
 	namespace, _ := args.String("--namespace")
 
 	dynamicClient := dynamic.NewDynamicClient(dynamicClientSet, k8sclient, namespace)
-	runner := exec.NewScenarioRunner(k8sclient, heartbeat, events, namespace, nodeConfig, podConfig, dynamicClient)
+	runner := exec.NewScenarioRunner(k8sclient, heartbeat, namespace, nodeConfig, podConfig, dynamicClient)
 	err = runner.RunScenario(scenario)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to complete scenario")

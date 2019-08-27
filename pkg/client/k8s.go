@@ -7,7 +7,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"		
 )
 
 func NewClientConfig(master string, kubeconfigPath string) (*restclient.Config, error) {
@@ -29,17 +28,6 @@ func NewK8sClient(master string, kubeconfigPath string) (*kubernetes.Clientset, 
 		return nil, err
 	}
 	return kubernetes.NewForConfig(kconfig)
-}
-
-func NewK8sEventClient(master string, kubeconfigPath string) (v1core.EventsGetter, error) {
-	kconfig, err := NewClientConfig(master, kubeconfigPath)
-	if err != nil {
-		return nil, err
-	}
-	kconfig.QPS = float32(5)
-	kconfig.Burst = int(10)
-	
-	return v1core.NewForConfig(kconfig)
 }
 
 func NewK8sHeartbeatClient(master string, kubeconfigPath string) (*kubernetes.Clientset, error) {

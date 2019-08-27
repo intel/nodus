@@ -9,7 +9,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"		
 	"github.com/IntelAI/nodus/pkg/config"
 	"github.com/IntelAI/nodus/pkg/dynamic"
 	"github.com/IntelAI/nodus/pkg/node"
@@ -28,12 +27,11 @@ type ScenarioRunner interface {
 	Shutdown()
 }
 
-func NewScenarioRunner(client *kubernetes.Clientset, heartbeat *kubernetes.Clientset, events v1core.EventsGetter, namespace string, nodeConfig *config.NodeConfig, podConfig *config.PodConfig, dynamicClient *dynamic.DynamicClient) ScenarioRunner {
+func NewScenarioRunner(client *kubernetes.Clientset, heartbeat *kubernetes.Clientset, namespace string, nodeConfig *config.NodeConfig, podConfig *config.PodConfig, dynamicClient *dynamic.DynamicClient) ScenarioRunner {
 	return &runner{
 		client:        client,
 		heartbeat:     heartbeat,
 		namespace:     namespace,
-	    events:        events,
 		nodeConfig:    nodeConfig,
 		podConfig:     podConfig,
 		gcPods:        map[string]bool{},
@@ -46,7 +44,6 @@ func NewScenarioRunner(client *kubernetes.Clientset, heartbeat *kubernetes.Clien
 type runner struct {
 	client        *kubernetes.Clientset
 	heartbeat     *kubernetes.Clientset
-	events        v1core.EventsGetter
 	dynamicClient *dynamic.DynamicClient
 	namespace     string
 	podConfig     *config.PodConfig
@@ -230,7 +227,7 @@ func (r *runner) createNode(create *config.CreateStep) error {
 			for i := uint64(0); i < create.Count; i++ {
 				nodeName := fmt.Sprintf("%s-%d", class.Name, i)
 				n := node.NewFakeNode(nodeName, class.Name, class.Labels, class.Resources)
-				err := n.Start(r.client, r.heartbeat, r.events)
+				err := n.Start(r.client, r.heartbeat)
 				if err != nil {
 					return fmt.Errorf("could not create node of class: %s, err: %s", create.Class, err.Error())
 				}

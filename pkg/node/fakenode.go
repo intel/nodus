@@ -6,19 +6,14 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	// "k8s.io/kubernetes/pkg/kubelet/events"		
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"	
 	"k8s.io/apimachinery/pkg/types"	
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/record"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"		
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"github.com/IntelAI/nodus/pkg/config"
-	"k8s.io/klog"
     // "encoding/json"	
 )
 
@@ -41,7 +36,7 @@ func NewFakeNode(name string, class string, labels map[string]string, resources 
 type FakeNode interface {
 	Name() string
 	Class() string
-	Start(kubeClient *kubernetes.Clientset, heartbeatClient *kubernetes.Clientset, eventClient v1core.EventsGetter) error
+	Start(kubeClient *kubernetes.Clientset, heartbeatClient *kubernetes.Clientset) error
 	Stop() error
 }
 
@@ -57,7 +52,6 @@ type fakeNode struct {
 	pods      PodSet
 	podWatch  watch.Interface
 	done      chan struct{}
-	recorder  record.EventRecorder
 }
 
 func (n *fakeNode) Name() string {
@@ -68,7 +62,7 @@ func (n *fakeNode) Class() string {
 	return n.class
 }
 
-func (n *fakeNode) Start(kubeClient *kubernetes.Clientset, heartbeatClient *kubernetes.Clientset, eventClient v1core.EventsGetter) error {
+func (n *fakeNode) Start(kubeClient *kubernetes.Clientset, heartbeatClient *kubernetes.Clientset) error {
 	n.kubeClient = kubeClient
 	n.heartbeatClient = heartbeatClient
 
@@ -78,11 +72,6 @@ func (n *fakeNode) Start(kubeClient *kubernetes.Clientset, heartbeatClient *kube
 		UID:       types.UID(n.name),
 		Namespace: "",
 	}
-	
-	eventBroadcaster := record.NewBroadcaster()
-	n.recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "kubelet", Host: string(n.name)})
-	eventBroadcaster.StartLogging(klog.V(3).Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: eventClient.Events("")})
 	
 	err := n.startWatchingPods()
 	if err != nil {

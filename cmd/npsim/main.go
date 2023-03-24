@@ -9,7 +9,6 @@ import (
 	"github.com/docopt/docopt-go"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
-
 	"github.com/IntelAI/nodus/pkg/client"
 	"github.com/IntelAI/nodus/pkg/config"
 	"github.com/IntelAI/nodus/pkg/node"
@@ -49,7 +48,13 @@ Options:
 	// Construct apiserver client
 	master, _ := args.String("--master")
 	kubeconfigPath, _ := args.String("--kubeconfig")
-	client, err := client.NewK8sClient(master, kubeconfigPath)
+	cl, err := client.NewK8sClient(master, kubeconfigPath)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct kubernetes client")
+		os.Exit(1)
+	}
+
+	heartbeat, err := client.NewK8sHeartbeatClient(master, kubeconfigPath)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to construct kubernetes client")
 		os.Exit(1)
@@ -62,7 +67,7 @@ Options:
 	log.Info("Creating nodes...")
 
 	nodes := makeNodes(nodeConfig)
-	err = start(nodes, client)
+	err = start(nodes, cl, heartbeat)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("failed to start nodes")
 		os.Exit(1)
@@ -91,9 +96,9 @@ func makeNodes(nodeConfig *config.NodeConfig) []node.FakeNode {
 	return nodes
 }
 
-func start(nodes []node.FakeNode, client *kubernetes.Clientset) (err error) {
+func start(nodes []node.FakeNode, kubeClient *kubernetes.Clientset, heartbeatClient *kubernetes.Clientset) (err error) {
 	for _, n := range nodes {
-		if err = n.Start(client); err != nil {
+		if err = n.Start(kubeClient, heartbeatClient); err != nil {
 			log.WithFields(log.Fields{
 				"node":  n.Name(),
 				"error": err.Error(),

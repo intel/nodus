@@ -1,6 +1,7 @@
 package client
 
 import (
+	"time"
 	log "github.com/sirupsen/logrus"
 	dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -23,6 +24,16 @@ func NewClientConfig(master string, kubeconfigPath string) (*restclient.Config, 
 
 func NewK8sClient(master string, kubeconfigPath string) (*kubernetes.Clientset, error) {
 	kconfig, err := NewClientConfig(master, kubeconfigPath)
+	if err != nil {
+		return nil, err
+	}
+	return kubernetes.NewForConfig(kconfig)
+}
+
+func NewK8sHeartbeatClient(master string, kubeconfigPath string) (*kubernetes.Clientset, error) {
+	kconfig, err := NewClientConfig(master, kubeconfigPath)
+	kconfig.Timeout = 30 * time.Second
+	kconfig.QPS = float32(-1)	
 	if err != nil {
 		return nil, err
 	}

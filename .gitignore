@@ -2,3 +2,4 @@ bin/
 kconfig
 kube-scheduler
 vendor
+Gopkg.lock
